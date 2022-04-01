@@ -1,0 +1,6 @@
+/.config.mk
+/target/
+/classes/
+/.cpcache/
+/.nrepl-port
+/.clj-kondo/.cache

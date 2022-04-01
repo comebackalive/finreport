@@ -1,0 +1,8 @@
+{:lint-as {mount.core/defstate           clojure.core/def
+           com.akovantsev.blet.core/blet clojure.core/let
+           kasta.i18n/reader-t           clojure.core/identity
+           kasta.i18n/t                  clojure.core/identity
+           kasta.i18n/clj-t              clojure.core/identity}
+ :hooks   {:analyze-call {better-cond.core/cond  hooks.better-cond/cond
+                          clojure.core.strint/<< hooks.strint/<<}}
+ :linters {:shadowed-var {:level :warning}}}
