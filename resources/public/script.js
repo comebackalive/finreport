@@ -7,7 +7,11 @@ function h(tag, attrs, children) {
   var el = document.createElement(tag);
   if (attrs) {
     Object.entries(attrs).forEach(([k, v]) => {
-      el.setAttribute(k, v);
+      if (k == 'target') {
+        v[0][v[1]] = el;
+      } else {
+        el.setAttribute(k, v);
+      }
     });
   }
 
@@ -19,6 +23,9 @@ function h(tag, attrs, children) {
 
   return el;
 }
+
+
+/// drag
 
 function handleDragOver(e) {
   e.preventDefault();
@@ -43,25 +50,36 @@ function handleDrop(e) {
   }
 }
 
+
+/// upload
+
 function uploadFile(file) {
   var list = document.getElementById('files');
-  var progress = h('progress');
-  var li = h('li', [file.name, h('br'), progress])
-  list.appendChild(li);
+  var t = {};
+
+  list.appendChild(
+    h('li', [file.name,
+             h('br'),
+             h('progress', {target: [t, 'progress']}),
+             h('span', {target: [t, 'details']})]));
 
   var form = new FormData();
   form.append('file', file);
 
   var xhr = new XMLHttpRequest();
   xhr.upload.addEventListener('progress', (e) => {
-    progress.max = e.total;
-    progress.value = e.loaded;
+    t.progress.max = e.total;
+    t.progress.value = e.loaded;
+    if (e.total == e.loaded) {
+      t.progress.className = 'yellow';
+      t.details.innerText = 'Processing...';
+    }
   });
   xhr.onreadystatechange = function(e) {
     if (xhr.readyState == 4) {
-      progress.value = progress.max;
-      progress.className = (xhr.status == 200 ? "success" : "failure");
-      li.appendChild(h('span', [xhr.responseText]));
+      t.progress.value = t.progress.max;
+      t.progress.className = (xhr.status == 200 ? "green" : "red");
+      t.details.innerText = xhr.responseText;
     }
   };
   xhr.open('POST', 'upload', true);

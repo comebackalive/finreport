@@ -11,12 +11,15 @@
   border-color: purple;
 }
 
-progress.success::-moz-progress-bar { background: green; }
-progress.success::-webkit-progress-value { background: green; }
-.success { color: green; }
-progress.failure::-moz-progress-bar { background: red; }
-progress.failure::-webkit-progress-value { background: red; }
-.failure { color: red; }
+progress.green::-moz-progress-bar { background: green; }
+progress.green::-webkit-progress-value { background: green; }
+.green { color: green; }
+progress.yellow::-moz-progress-bar { background: yellow; }
+progress.yellow::-webkit-progress-value { background: yellow; }
+.yellow { color: yellow; }
+progress.red::-moz-progress-bar { background: red; }
+progress.red::-webkit-progress-value { background: red; }
+.red { color: red; }
 
 p {
   margin-top: 0;
