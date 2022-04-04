@@ -22,7 +22,8 @@ clean:
 release:
 	git tag 1.$(shell git rev-list --count HEAD)
 
-deploy:
-	test -f target/finreport-$(shell git describe --tags).jar
+target/finreport-%.jar: uber
+
+deploy: target/finreport-$(shell git describe --tags).jar
 	scp target/finreport-$(shell git describe --tags).jar report:
 	ssh report -- 'sudo mv finreport*.jar /opt/finreport/finreport.jar && sudo systemctl restart finreport'

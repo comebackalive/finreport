@@ -48,12 +48,31 @@
 
 ;;; Cleaning
 
+(def BANKS
+  #{"АТ «ПУМБ»"
+    "ПАТ «БАНК ВОСТОК»"
+    "АТ \"Райффайзен Банк\""
+    "АТ \"АЛЬФА-БАНК\""
+    "Акціонерний банк \"Південний\""
+    "АТ \"Полтава-банк\""
+    "ПрАТ \"БАНК ФАМІЛЬНИЙ\""})
+
+(def TRASH-SENDER-RE
+  #"(?x)
+    МВПС|
+    Транз.счет|
+    Транзит за розрах|
+    Транз.рах.|
+    ІНШІ ГОТІВКОВІ|
+    Ощадбанк|
+    ОЩАДБАНК|
+    ПРАВЕКС")
+
+
 (defn maybe-drop-sender [s]
   (when-not (or (not s)
-                (str/includes? s "МВПС")
-                (str/includes? s "Транз.счет")
-                (str/includes? s "Транзит за розрах")
-                (str/includes? s "Транз.рах."))
+                (contains? BANKS s)
+                (re-find TRASH-SENDER-RE s))
     s))
 
 
@@ -103,6 +122,12 @@
       message)))
 
 
+(defn fmt-amount [amount]
+  (if (zero? (mod amount 1))
+    (long amount)
+    amount))
+
+
 (def CONFIG
   {:oschad     {:start #(str/includes? % "№ п/п")
                 :skip  #(or (= (get % 13) "ТОВ \"ФК \"ЕЛАЄНС\"")
@@ -133,7 +158,7 @@
                                  amount   (get % 3)
                                  currency (get % 4)]
                              (format "%s (%s %s)"
-                               message amount currency))}}
+                               message (fmt-amount amount) currency))}}
    :fondy      {:start #(str/includes? % "Внутрішній ID")
                 :skip  #(not= (get % 3) "approved")
                 :fields
@@ -221,11 +246,13 @@
         {start-fn :start
          skip-fn  :skip
          fields   :fields} (get CONFIG bank)
-        xf                 (comp (remove #(or (empty? (first %))
-                                              (< (count %) 5)
-                                              (skip-fn %)))
+        xf                 (comp
+                             (remove #(or (empty? (first %))
+                                          (< (count %) 5)
+                                          (skip-fn %)))
                              (map-indexed (partial parse-row fields))
-                             (remove #(nil? (:amount %))))]
+                             (remove #(or (nil? (:amount %))
+                                          (neg? (:amount %)))))]
     (printf "Parsing %s from %s...\n" bank path)
     (->> rows
          (drop-while #(not (start-fn %)))
@@ -288,4 +315,4 @@
            (write-fn path)))))
 
 (comment
-  (time (-main "--csv" "/Users/piranha/dev/misc/pzh-finance/clj-finreport/Ощад_28_02_2022.xlsx")))
+  (time (-main "--csv" "/Users/piranha/Downloads/513834511-2022-03-31--2022-03-31.Xlsx")))
