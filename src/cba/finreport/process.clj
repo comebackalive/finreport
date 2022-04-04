@@ -208,8 +208,8 @@
 (defn process [path content]
   (println "Working on" path)
   (let [content (or content (io/file path))
-        rows    (cond (str/ends-with? path ".csv") (read-csv content)
-                      (re-find #"\.xlsx?$" path)   (read-xls content)
+        rows    (cond (re-find #"(?i).csv$" path)    (read-csv content)
+                      (re-find #"(?i)\.xlsx?$" path) (read-xls content)
                       :else
                       (throw (ex-info "Unknown file format"
                                {:path path})))
