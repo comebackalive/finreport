@@ -105,7 +105,7 @@
 
 (def CONFIG
   {:oschad     {:start #(str/includes? % "№ п/п")
-                :skip  #(or (= (get % 13) "ТОВ ФК \"ЕЛАЄНС\"")
+                :skip  #(or (= (get % 13) "ТОВ \"ФК \"ЕЛАЄНС\"")
                             ;; no date - no transaction
                             (= (get % 4) nil))
                 :fields
