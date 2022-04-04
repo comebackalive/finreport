@@ -73,9 +73,11 @@
           res   @res
           total (- (System/currentTimeMillis) start)]
       {:status 200
-       :body   (format "Size: %s, rows with data: %s, archived: %s, took %sms"
+       :body   (format
+                 "Size: %sb, rows with data: %s (was %s), archived: %s, took %sms"
                  (:size f)
-                 cnt
+                 (:inserted cnt)
+                 (:deleted cnt)
                  (boolean (:ETag res))
                  total)})
     (catch Exception e

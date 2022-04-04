@@ -8,7 +8,8 @@
             [clojure.data.csv :as csv]
             [next.jdbc.sql :as sql]
 
-            [cba.finreport.db :as db]))
+            [cba.finreport.db :as db]
+            [next.jdbc :as jdbc]))
 
 
 (set! *warn-on-reflection* true)
@@ -18,15 +19,17 @@
 (def dt-fmt (DateTimeFormatter/ofPattern "dd.MM.yyyy HH:mm:ss"))
 (def date-fmt (DateTimeFormatter/ofPattern "dd.MM.yyyy"))
 
-(defn parse-dt [s]
-  (if (string? s)
-    (LocalDateTime/parse s dt-fmt)
-    s))
+(defn dt [s]
+  (cond
+    (string? s)             (LocalDateTime/parse s dt-fmt)
+    (instance? LocalDate s) (.atStartOfDay ^LocalDate s)
+    :else                   s))
 
-(defn parse-d [s]
-  (if (string? s)
-    (.atStartOfDay (LocalDate/parse s date-fmt))
-    s))
+(defn date [s]
+  (cond
+    (string? s)                 (LocalDate/parse s date-fmt)
+    (instance? LocalDateTime s) (.toLocalDate ^LocalDateTime s)
+    :else                       s))
 
 
 (defn parse-n [s]
@@ -108,7 +111,7 @@
                 :fields
                 {:id      #(get % 0)
                  :bank    (constantly "Oschad UAH")
-                 :date    #(parse-d (get % 4))
+                 :date    #(dt (date (get % 4)))
                  :amount  #(parse-n (get % 10))
                  :comment #(make-comment (get % 13) (get % 19))}}
    :privat     {:start #(str/includes? % "Дата проводки")
@@ -116,7 +119,7 @@
                 :fields
                 {:id      #(get % 0)
                  :bank    (constantly "Privat UAH")
-                 :date    #(parse-dt (str (get % 1) " " (get % 2)))
+                 :date    #(dt (str (get % 1) " " (get % 2)))
                  :amount  #(parse-n (get % 3))
                  :comment #(make-comment (get % 7) (get % 5))}}
    :privat-ext {:start #(str/includes? % "Дата проводки")
@@ -124,7 +127,7 @@
                 :fields
                 {:id      #(get % 0)
                  :bank    #(str "Privat " (get % 4))
-                 :date    #(parse-dt (str (get % 1) " " (get % 2)))
+                 :date    #(dt (str (get % 1) " " (get % 2)))
                  :amount  #(parse-n (get % 6))
                  :comment #(let [message  (cleanup-ext (get % 7))
                                  amount   (get % 3)
@@ -138,7 +141,7 @@
                  :bank    #(if (str/starts-with? (get % 6) "SUB-")
                              "Fondy Sub"
                              "Fondy")
-                 :date    #(parse-dt (get % 1))
+                 :date    #(dt (get % 1))
                  :amount  #(get % 10)
                  :comment #(let [amount   (get % 4)
                                  currency (get % 5)
@@ -252,16 +255,23 @@
 
 
 (defn write-db [path rows]
-  (let [fname  (file-name path)
-        fields [:fname :bank :date :amount :comment]]
-    (db/q ["delete from report report where fname = ?" fname])
-    (apply +
-      (for [batch (partition-all 1000 rows)]
-        (->> batch
-             (map (fn [row]
-                    [fname (:bank row) (:date row) (:amount row) (:comment row)]))
-             (sql/insert-multi! db/conn :report fields)
-             count)))))
+  (let [fname    (file-name path)
+        uniqs    (group-by (juxt :bank (comp date :date)) rows)
+        delres   (for [[bank d] (keys uniqs)]
+                   (db/one ["delete from report where bank = ? and date(date) = ?"
+                            bank d]))
+        fields   [:fname :bank :date :amount :comment]
+        mkrow    (fn [row]
+                   [fname (:bank row) (:date row) (:amount row) (:comment row)])
+        insres   (for [batch (partition-all 1000 rows)]
+                   (->> batch
+                        (map mkrow)
+                        (sql/insert-multi! db/conn :report fields)
+                        count))
+        deleted  (apply + (map ::jdbc/update-count delres))
+        inserted (apply + insres)]
+    {:deleted  deleted
+     :inserted inserted}))
 
 
 ;;; control
