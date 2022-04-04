@@ -27,21 +27,23 @@ function h(tag, attrs, children) {
 
 /// drag
 
-function handleDragOver(e) {
-  e.preventDefault();
+var _dragCounter = 0;
+
+function prevent(e) { e.preventDefault(); }
+function dragStart(e) {
+  e.target.closest('.dropzone').classList.add('highlight');
+  _dragCounter += 1;
+}
+function dragStop(e)  {
+  _dragCounter -= 1;
+  if (_dragCounter <= 0) {
+    e.target.closest('.dropzone').classList.remove('highlight');
+  }
 }
 
-function handleDragEnter(e) {
-  e.target.classList.add('highlight');
-}
-
-function handleDragLeave(e) {
-  e.target.classList.remove('highlight');
-}
-
-function handleDrop(e) {
-  e.preventDefault();
-  e.target.classList.remove('highlight');
+function drop(e) {
+  _dragCounter = 0;
+  e.target.closest('.dropzone').classList.remove('highlight');
 
   var files = e.dataTransfer.files;
 

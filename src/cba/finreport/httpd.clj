@@ -47,10 +47,11 @@
          [:link {:rel "stylesheet" :href "static/style.css"}]
          [:title "Upload Financial Reports"]]
         [:body
-         [:div#dropzone {:ondrop      "handleDrop(event)"
-                         :ondragover  "handleDragOver(event)"
-                         :ondragenter "handleDragEnter(event)"
-                         :ondragleave "handleDragLeave(event)"}
+         [:div.dropzone
+          {:ondrop      "prevent(event); drop(event)"
+           :ondragover  "prevent(event)"
+           :ondragenter "dragStart(event)"
+           :ondragleave "dragStop(event)"}
           [:h1 "Drop them all here"]
           [:ul#files]]
          [:script {:src "static/script.js"}]]]))})
