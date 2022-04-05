@@ -73,16 +73,14 @@
   (try
     (let [start (System/currentTimeMillis)
           f     (get-in req [:multipart-params "file"])
-          res   (future
-                  (let [ba (-> (:tempfile f) io/input-stream .readAllBytes)]
-                    (aws/invoke s3
-                      {:op      :PutObject
-                       :request {:Bucket "cba-finreport-archive"
-                                 :Key    (process/file-name (:filename f))
-                                 :Body   ba}})))
           cnt   (->> (process/process (:filename f) (:tempfile f))
                      (process/write-db (:filename f)))
-          res   @res
+          res   (let [ba (-> (:tempfile f) io/input-stream .readAllBytes)]
+                  (aws/invoke s3
+                    {:op      :PutObject
+                     :request {:Bucket "cba-finreport-archive"
+                               :Key    (process/file-name (:filename f))
+                               :Body   ba}}))
           total (- (System/currentTimeMillis) start)]
       {:status 200
        :body   (format
