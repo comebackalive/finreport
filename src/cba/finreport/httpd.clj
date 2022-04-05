@@ -14,8 +14,12 @@
             [clojure.java.io :as io]))
 
 
-(def s3 (aws/client {:api    :s3
-                     :region "us-east-1"}))
+(def *s3 (aws/client {:api    :s3
+                      :region "us-east-1"}))
+(def ARCHIVE "cba-finreport-archive")
+
+(defn s3 [op request]
+  (aws/invoke *s3 {:op op :request request}))
 
 
 
@@ -76,11 +80,9 @@
           cnt   (->> (process/process (:filename f) (:tempfile f))
                      (process/write-db (:filename f)))
           res   (let [ba (-> (:tempfile f) io/input-stream .readAllBytes)]
-                  (aws/invoke s3
-                    {:op      :PutObject
-                     :request {:Bucket "cba-finreport-archive"
-                               :Key    (process/file-name (:filename f))
-                               :Body   ba}}))
+                  (s3 :PutObject {:Bucket ARCHIVE
+                                  :Key    (process/file-name (:filename f))
+                                  :Body   ba}))
           total (- (System/currentTimeMillis) start)]
       {:status 200
        :body   (format
@@ -95,6 +97,17 @@
         {:status 400
          :body   (str (.getMessage e) ": " (pr-str (ex-data e)))}
         (throw e)))))
+
+
+(defn reprocess [& fnames]
+  (doseq [fname (or (seq fnames)
+                    (->> (:Contents
+                          (s3 :ListObjectsV2 {:Bucket ARCHIVE}))
+                         (map :Key)))
+          :let [data (s3 :GetObject {:Bucket ARCHIVE
+                                     :Key    fname})]]
+    (time (->> (process/process fname (:Body data))
+               (process/write-db fname)))))
 
 
 (defn mk-handler [req func & names]
