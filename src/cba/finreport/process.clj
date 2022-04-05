@@ -81,6 +81,7 @@
        (map str/capitalize)
        (str/join " ")))
 
+
 (defn cleanup-ext [s]
   (-> (reduce (fn [s [re sub]]
                 (str/replace s re sub))
@@ -91,6 +92,7 @@
           (fn [[_m _ full-name message]]
             (str (capitalize-every full-name) " " message))]])
       str/trim))
+
 
 (comment
   (cleanup-ext "From SOME ONE SZEWCZENKI 12/3 79666 LWOW UA UA for Przelew"))
@@ -148,7 +150,8 @@
                  :amount  #(parse-n (get % 3))
                  :comment #(make-comment (get % 7) (get % 5))}}
    :privat-ext {:start #(str/includes? % "Дата проводки")
-                :skip  (constantly false)
+                ;; be careful
+                :skip  #(str/starts-with? (get % 7) "Купiвля")
                 :fields
                 {:id      #(get % 0)
                  :bank    #(str "Privat " (get % 4))
@@ -250,8 +253,8 @@
                                           (skip-fn %)))
                              (map-indexed (partial parse-row fields))
                              (remove #(or (nil? (:amount %))
-                                          (neg? (:amount %)))))
-        _                  (printf "Parsing %s from %s...\n" bank path)]
+                                          (neg? (:amount %)))))]
+    (printf "Parsing %s from %s...\n" bank path)
     (->> rows
          (drop-while #(not (start-fn %)))
          rest
@@ -323,4 +326,4 @@
            (write-fn path)))))
 
 (comment
-  (time (-main "--csv" "/Users/piranha/Downloads/513834511-2022-03-31--2022-03-31.Xlsx")))
+  (time (-main "--csv" "/Users/piranha/Downloads/0000002625788621.xls")))
