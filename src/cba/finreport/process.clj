@@ -88,9 +88,9 @@
         s
         [[#"(?ui)dr\. " ""]
          [#"," ""]
-         [#"From (\d+/)?([^ ]+ [^ ]+).*?(for .*)?$"
+         [#"From (\d+/)?([^ ]+ [^ ]+).*?(?:for (.*))?$"
           (fn [[_m _ full-name message]]
-            (str (capitalize-every full-name) " " message))]])
+            (str (capitalize-every full-name) " -- " message))]])
       str/trim))
 
 
@@ -150,8 +150,9 @@
                  :amount  #(parse-n (get % 3))
                  :comment #(make-comment (get % 7) (get % 5))}}
    :privat-ext {:start #(str/includes? % "Дата проводки")
-                ;; be careful
-                :skip  #(str/starts-with? (get % 7) "Купiвля")
+                ;; be careful, it has latin i
+                :skip  #(or (str/starts-with? (get % 7) "Купiвля")
+                            (= "From for" (get % 7)))
                 :fields
                 {:id      #(get % 0)
                  :bank    #(str "Privat " (get % 4))
@@ -326,4 +327,4 @@
            (write-fn path)))))
 
 (comment
-  (time (-main "--csv" "/Users/piranha/Downloads/0000002625788621.xls")))
+  (time (-main "--csv" "/Users/piranha/Downloads/0000002625788641.xls")))
