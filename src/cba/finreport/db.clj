@@ -59,10 +59,13 @@
   )
 
 
-(defn q [query]
-  (jdbc/execute! conn query
-    {:builder-fn jdbc-rs/as-unqualified-lower-maps}))
+(defn q
+  ([query] (q conn query))
+  ([conn query]
+   (jdbc/execute! conn query
+     {:builder-fn jdbc-rs/as-unqualified-lower-maps})))
 
 
-(defn one [query]
-  (first (q query)))
+(defn one
+  ([query] (first (q query)))
+  ([conn query] (first (q conn query))))

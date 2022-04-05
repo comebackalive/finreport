@@ -196,8 +196,6 @@
   (let [s     (io/input-stream path)
         wb    (WorkbookFactory/create s)
         sheet (.getSheetAt wb 0)]
-    #_ (for [i (range (.getLastRowNum sheet))]
-         (mapv str (.getRow sheet i)))
     (for [row sheet]
       (mapv read-cell row))))
 
@@ -252,8 +250,8 @@
                                           (skip-fn %)))
                              (map-indexed (partial parse-row fields))
                              (remove #(or (nil? (:amount %))
-                                          (neg? (:amount %)))))]
-    (printf "Parsing %s from %s...\n" bank path)
+                                          (neg? (:amount %)))))
+        _                  (printf "Parsing %s from %s...\n" bank path)]
     (->> rows
          (drop-while #(not (start-fn %)))
          rest
@@ -281,24 +279,34 @@
       (csv/write-csv w (map getter rows)))))
 
 
+(defn bank-days [rows]
+  (persistent!
+    (reduce
+      (fn [ret row]
+        (conj! ret [(:bank row) (date (:date row))]))
+      (transient #{})
+      rows)))
+
+
 (defn write-db [path rows]
-  (let [fname    (file-name path)
-        uniqs    (group-by (juxt :bank (comp date :date)) rows)
-        delres   (for [[bank d] (keys uniqs)]
-                   (db/one ["delete from report where bank = ? and date(date) = ?"
-                            bank d]))
-        fields   [:fname :bank :date :amount :comment]
-        mkrow    (fn [row]
-                   [fname (:bank row) (:date row) (:amount row) (:comment row)])
-        insres   (for [batch (partition-all 1000 rows)]
-                   (->> batch
-                        (map mkrow)
-                        (sql/insert-multi! db/conn :report fields)
-                        count))
-        deleted  (apply + (map ::jdbc/update-count delres))
-        inserted (apply + insres)]
-    {:deleted  deleted
-     :inserted inserted}))
+  (jdbc/with-transaction [tx db/conn]
+    (let [fname    (file-name path)
+          delres   (for [[bank d] (bank-days rows)]
+                     (db/one tx
+                       ["delete from report where bank = ? and date(date) = ?"
+                        bank d]))
+          fields   [:fname :bank :date :amount :comment]
+          mkrow    (fn [row]
+                     [fname (:bank row) (:date row) (:amount row) (:comment row)])
+          insres   (for [batch (partition-all 1000 rows)]
+                     (->> batch
+                          (map mkrow)
+                          (sql/insert-multi! tx :report fields)
+                          count))
+          deleted  (apply + (map ::jdbc/update-count delres))
+          inserted (apply + insres)]
+      {:deleted  deleted
+       :inserted inserted})))
 
 
 ;;; control

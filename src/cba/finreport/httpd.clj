@@ -57,6 +57,18 @@
          [:script {:src "static/script.js"}]]]))})
 
 
+(defn human-bytes
+  "https://stackoverflow.com/questions/3758606#answer-24805871"
+  [^long v]
+  (if (< v 1024)
+    (str v "B")
+    (let [z (-> (- 63 (Long/numberOfLeadingZeros v))
+                (/ 10))]
+      (format "%.1f%sB"
+        (/ (double v) (bit-shift-left 1 (* (int z) 10)))
+        (.charAt " KMGTPE" z)))))
+
+
 (defn upload [req]
   (try
     (let [start (System/currentTimeMillis)
@@ -74,8 +86,8 @@
           total (- (System/currentTimeMillis) start)]
       {:status 200
        :body   (format
-                 "Size: %sb, rows with data: %s (was %s), archived: %s, took %sms"
-                 (:size f)
+                 "Size: %s, rows with data: %s (was %s), archived: %s, took %sms"
+                 (human-bytes (:size f))
                  (:inserted cnt)
                  (:deleted cnt)
                  (boolean (:ETag res))
