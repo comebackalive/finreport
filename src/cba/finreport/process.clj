@@ -152,6 +152,7 @@
    :privat-ext {:start #(str/includes? % "Дата проводки")
                 ;; be careful, it has latin i
                 :skip  #(or (str/starts-with? (get % 7) "Купiвля")
+                            ;; this is when payments return
                             (= "From for" (get % 7)))
                 :fields
                 {:id      #(get % 0)
@@ -313,18 +314,27 @@
        :inserted inserted})))
 
 
+(defn process-and-store [mode path content]
+  (let [write-fn (case mode
+                   :db  write-db
+                   :csv write-csv)
+        data     (process path content)
+        res      (write-fn path data)]
+    res))
+
+
 ;;; control
 
 (defn -main [& args]
   (let [{opts true
          args false} (group-by #(str/starts-with? % "-") args)
         opts         (into #{} opts)
-        write-fn     (if (contains? opts "--csv")
-                       write-csv
-                       write-db)]
+        mode     (if (contains? opts "--csv") :csv :db)]
     (doseq [path args]
-      (->> (process path nil)
-           (write-fn path)))))
+      (process-and-store mode path nil))))
 
 (comment
-  (time (-main "--csv" "/Users/piranha/Downloads/0000002625788641.xls")))
+  (time (process-and-store
+          :db
+          "/Users/piranha/Downloads/0000002625801021_грн.xls"
+          nil)))
