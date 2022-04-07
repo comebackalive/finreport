@@ -73,14 +73,14 @@ function uploadFile(file) {
     t.progress.max = e.total;
     t.progress.value = e.loaded;
     if (e.total == e.loaded) {
-      t.progress.className = 'yellow';
+      t.details.className = 'spinner';
       t.details.innerText = 'Processing...';
     }
   });
   xhr.onreadystatechange = function(e) {
     if (xhr.readyState == 4) {
       t.progress.value = t.progress.max;
-      t.progress.className = (xhr.status == 200 ? "green" : "red");
+      t.details.className = (xhr.status == 200 ? "success" : "error");
       t.details.innerText = xhr.responseText;
     }
   };
