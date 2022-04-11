@@ -1,6 +1,6 @@
 (ns cba.finreport.process
   (:import [java.time LocalDateTime LocalDate]
-           [java.time.format DateTimeFormatter]
+           [java.time.format DateTimeFormatter DateTimeParseException]
            [org.apache.poi.ss.usermodel WorkbookFactory Cell CellType
             DateUtil])
   (:require [clojure.java.io :as io]
@@ -18,11 +18,14 @@
 ;;; Parsing
 
 (def dt-fmt (DateTimeFormatter/ofPattern "dd.MM.yyyy HH:mm:ss"))
+(def fondy-dt-fmt (DateTimeFormatter/ofPattern "dd.MM.yy HH:mm:ss"))
 (def date-fmt (DateTimeFormatter/ofPattern "dd.MM.yyyy"))
 
 (defn dt [s]
   (cond
-    (string? s)             (LocalDateTime/parse s dt-fmt)
+    (string? s)             (try (LocalDateTime/parse s dt-fmt)
+                                 (catch DateTimeParseException _
+                                   (LocalDateTime/parse s fondy-dt-fmt)))
     (instance? LocalDate s) (.atStartOfDay ^LocalDate s)
     :else                   s))
 
@@ -173,7 +176,7 @@
                              "Fondy Sub"
                              "Fondy")
                  :date    #(dt (get % 1))
-                 :amount  #(get % 10)
+                 :amount  #(parse-n (get % 10))
                  :comment #(let [amount   (get % 4)
                                  currency (get % 5)
                                  card     (get % 12)
@@ -185,7 +188,12 @@
 ;;; Reading
 
 (defn read-csv [path]
-  (csv/read-csv (io/reader path)))
+  (let [line (.readLine ^java.io.BufferedReader (io/reader path))
+        sep  (if (< (count (re-seq #"," line))
+                    (count (re-seq #";" line)))
+               \;
+               \,)]
+    (csv/read-csv (io/reader path) :separator sep)))
 
 
 (defn read-cell [^Cell cell]
@@ -226,13 +234,14 @@
                {:row row :i i} e)))))
 
 
-(defn detect [data]
-  (let [rows (into [] (take 5 data))]
+(defn detect-bank [data]
+  (let [rows (into [] (take 5 data))
+        g    (fn [x y] (str/trim (get-in rows [x y])))]
     (cond
-      (= (get-in rows [0 0]) "Внутрішній ID")                     :fondy
-      (= (get-in rows [0 0]) "Назва Клієнта")                     :oschad
-      (= (get-in rows [1 6]) "Сума еквівалент у гривні")          :privat-ext
-      (str/starts-with? (get-in rows [0 0]) "Виписка по рахунку") :privat
+      (= (g 0 0) "Внутрішній ID")                     :fondy
+      (= (g 0 0) "Назва Клієнта")                     :oschad
+      (= (g 1 6) "Сума еквівалент у гривні")          :privat-ext
+      (str/starts-with? (g 0 0) "Виписка по рахунку") :privat
       :else
       (throw (ex-info "Unknown bank!" {:rows rows})))))
 
@@ -246,7 +255,7 @@
                       (throw (ex-info "Unknown file format"
                                {:path path})))
 
-        bank               (detect rows)
+        bank               (detect-bank rows)
         {start-fn :start
          skip-fn  :skip
          fields   :fields} (get CONFIG bank)
