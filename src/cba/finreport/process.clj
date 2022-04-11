@@ -321,6 +321,7 @@
                    :csv write-csv)
         data     (process path content)
         res      (write-fn path data)]
+    (log/info "Processing finished" path)
     res))
 
 

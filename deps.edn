@@ -1,9 +1,9 @@
 {:paths ["src" "resources" "test"]
  :deps
- {org.clojure/clojure             {:mvn/version "1.11.0"}
+ {org.clojure/clojure             {:mvn/version "1.11.1"}
   ring/ring-core                  {:mvn/version "1.9.5"}
   ;; multipart depends on that :(
-  javax.servlet/javax.servlet-api {:mvn/version "3.1.0"}
+  javax.servlet/javax.servlet-api {:mvn/version "4.0.1"}
   ;; ring/ring-json       {:mvn/version "0.5.1"}
   ;; ring/ring-defaults   {:mvn/version "0.3.3"}
   ;; metosin/reitit-core  {:mvn/version "0.5.17"}
@@ -13,23 +13,24 @@
   mount/mount                     {:mvn/version "0.1.16"}
   hiccup/hiccup                   {:mvn/version "2.0.0-alpha2"}
 
-  org.clojure/data.csv        {:mvn/version "1.0.0"}
+  org.clojure/data.csv        {:mvn/version "1.0.1"}
   org.apache.poi/poi          {:mvn/version "5.2.2"}
   org.apache.poi/poi-ooxml    {:mvn/version "5.2.2"}
   com.cognitect.aws/api       {:mvn/version "0.8.539"}
-  com.cognitect.aws/endpoints {:mvn/version "1.1.12.186"}
-  com.cognitect.aws/s3        {:mvn/version "820.2.1083.0"}
+  com.cognitect.aws/endpoints {:mvn/version "1.1.12.192"}
+  com.cognitect.aws/s3        {:mvn/version "822.2.1109.0"}
 
   ;; logging
-  io.sentry/sentry-clj           {:mvn/version "5.7.171"}
-  org.slf4j/slf4j-api            {:mvn/version "1.7.36"}
-  ch.qos.logback/logback-classic {:mvn/version "1.2.11"}
-  org.clojure/tools.logging      {:mvn/version "1.2.4"}
+  io.sentry/sentry-clj                    {:mvn/version "5.7.177"}
+  org.slf4j/slf4j-api                     {:mvn/version "1.7.36"}
+  ch.qos.logback/logback-classic          {:mvn/version "1.2.11"}
+  org.clojure/tools.logging               {:mvn/version "1.2.4"}
+  org.apache.logging.log4j/log4j-to-slf4j {:mvn/version "2.17.2"}
 
   ;; db
   org.postgresql/postgresql         {:mvn/version "42.3.3"}
   ;;com.zaxxer/HikariCP               {:mvn/version "5.0.1"}
-  com.github.seancorfield/next.jdbc {:mvn/version "1.2.772"}
+  com.github.seancorfield/next.jdbc {:mvn/version "1.2.780"}
   ;;com.github.seancorfield/honeysql  {:mvn/version "2.2.868"}
   dev.weavejester/ragtime           {:mvn/version "0.9.1"}}
 
