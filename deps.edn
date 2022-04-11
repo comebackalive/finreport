@@ -21,9 +21,10 @@
   com.cognitect.aws/s3        {:mvn/version "820.2.1083.0"}
 
   ;; logging
-  io.sentry/sentry-clj   {:mvn/version "5.7.171"}
-  org.slf4j/slf4j-api    {:mvn/version "1.7.36"}
-  org.slf4j/slf4j-simple {:mvn/version "1.7.36"}
+  io.sentry/sentry-clj           {:mvn/version "5.7.171"}
+  org.slf4j/slf4j-api            {:mvn/version "1.7.36"}
+  ch.qos.logback/logback-classic {:mvn/version "1.2.11"}
+  org.clojure/tools.logging      {:mvn/version "1.2.4"}
 
   ;; db
   org.postgresql/postgresql         {:mvn/version "42.3.3"}

@@ -74,7 +74,6 @@ function uploadFile(file) {
     t.progress.value = e.loaded;
     if (e.total == e.loaded) {
       t.details.className = 'spinner';
-      t.details.innerText = 'Processing...';
     }
   });
   xhr.onreadystatechange = function(e) {

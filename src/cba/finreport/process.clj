@@ -6,6 +6,7 @@
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.data.csv :as csv]
+            [clojure.tools.logging :as log]
             [next.jdbc.sql :as sql]
 
             [cba.finreport.db :as db]
@@ -237,7 +238,7 @@
 
 
 (defn process [path content]
-  (println "Working on" path)
+  (log/info "Working on" path)
   (let [content (or content (io/file path))
         rows    (cond (re-find #"(?i).csv$" path)    (read-csv content)
                       (re-find #"(?i)\.xlsx?$" path) (read-xls content)
