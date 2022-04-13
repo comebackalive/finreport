@@ -187,13 +187,23 @@
 
 ;;; Reading
 
-(defn read-csv [path]
-  (let [line (.readLine ^java.io.BufferedReader (io/reader path))
+(defn guess-file-enc [f]
+  (let [line (.readLine (io/reader f))]
+    (if (some
+          #(= Character/OTHER_SYMBOL (Character/getType %))
+          (.toCharArray line))
+      "cp1251"
+      "utf-8")))
+
+(defn read-csv [f]
+  (let [enc  (guess-file-enc f)
+        line (with-open [r (io/reader f :encoding enc)]
+               (.readLine ^java.io.BufferedReader r))
         sep  (if (< (count (re-seq #"," line))
                     (count (re-seq #";" line)))
                \;
                \,)]
-    (csv/read-csv (io/reader path) :separator sep)))
+    (csv/read-csv (io/reader f :encoding enc) :separator sep)))
 
 
 (defn read-cell [^Cell cell]
@@ -236,7 +246,7 @@
 
 (defn detect-bank [data]
   (let [rows (into [] (take 5 data))
-        g    (fn [x y] (str/trim (get-in rows [x y])))]
+        g    (fn [x y] (some-> (get-in rows [x y]) str/trim))]
     (cond
       (= (g 0 0) "Внутрішній ID")                     :fondy
       (= (g 0 0) "Назва Клієнта")                     :oschad
