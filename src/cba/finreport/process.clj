@@ -1,8 +1,8 @@
 (ns cba.finreport.process
-  (:import [java.time LocalDateTime LocalDate]
+  (:import [java.util Date]
+           [java.time LocalDateTime LocalDate ZoneId]
            [java.time.format DateTimeFormatter DateTimeParseException]
-           [org.apache.poi.ss.usermodel WorkbookFactory Cell CellType
-            DateUtil])
+           [org.apache.poi.ss.usermodel WorkbookFactory Cell CellType DateUtil])
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.data.csv :as csv]
@@ -33,6 +33,8 @@
   (cond
     (string? s)                 (LocalDate/parse s date-fmt)
     (instance? LocalDateTime s) (.toLocalDate ^LocalDateTime s)
+    (instance? Date s)          (LocalDate/ofInstant (.toInstant ^Date s)
+                                  (ZoneId/systemDefault))
     :else                       s))
 
 
@@ -188,9 +190,10 @@
 ;;; Reading
 
 (defn guess-file-enc [f]
-  (let [line (.readLine (io/reader f))]
+  (let [line (.readLine ^java.io.BufferedReader (io/reader f))]
     (if (some
-          #(= Character/OTHER_SYMBOL (Character/getType %))
+          (fn [^Character c]
+            (= Character/OTHER_SYMBOL (Character/getType c)))
           (.toCharArray line))
       "cp1251"
       "utf-8")))
@@ -206,7 +209,7 @@
     (csv/read-csv (io/reader f :encoding enc) :separator sep)))
 
 
-(defn read-cell [^Cell cell]
+(defn read-xls-cell [^Cell cell]
   (condp = (.getCellType cell)
     CellType/NUMERIC (if (DateUtil/isCellDateFormatted cell)
                        (.getDateCellValue cell)
@@ -221,13 +224,15 @@
         wb    (WorkbookFactory/create s)
         sheet (.getSheetAt wb 0)]
     (for [row sheet]
-      (mapv read-cell row))))
+      (mapv read-xls-cell row))))
+
 
 (comment
   (def x (read-xls "БФ_Приват_злотий_29_03_2022.xls"))
   (def x (read-xls "/Users/piranha/dev/misc/pzh-finance/clj-finreport/Ощад_28_02_2022.xlsx"))
+  (def x (read-xls "/Users/piranha/dev/misc/pzh-finance/clj-finreport/49949__1622114.xlsx"))
 
-  (->> x (drop 20) first prn))
+  (->> x (drop 5) first))
 
 
 ;;; Convert
@@ -355,6 +360,10 @@
       (process-and-store mode path nil))))
 
 (comment
+  (def x (process "/Users/piranha/dev/misc/pzh-finance/clj-finreport/49949__1622114.xlsx" nil))
+
+  (time (write-db "49949__1622114.xlsx" x))
+
   (time (process-and-store
           :db
           "/Users/piranha/Downloads/0000002625801021_грн.xls"

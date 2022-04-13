@@ -86,17 +86,17 @@
       {:status  200
        :headers {"Content-Type" "text/plain"}
        :body    (format
-                 "Size: %s, rows with data: %s (was %s), archived: %s, took %sms"
-                 (human-bytes (:size f))
-                 (:inserted cnt)
-                 (:deleted cnt)
-                 (boolean (:ETag res))
-                 total)})
+                  "Size: %s, rows with data: %s (was %s), archived: %s, took %sms"
+                  (human-bytes (:size f))
+                  (:inserted cnt)
+                  (:deleted cnt)
+                  (boolean (:ETag res))
+                  total)})
     (catch Exception e
       (if (ex-data e)
-        {:status 400
+        {:status  400
          :headers {"Content-Type" "text/plain"}
-         :body   (str (.getMessage e) ": " (pr-str (ex-data e)))}
+         :body    (str (.getMessage e) ": " (pr-str (ex-data e)))}
         (throw e)))))
 
 
