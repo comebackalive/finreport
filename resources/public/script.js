@@ -55,6 +55,18 @@ function drop(e) {
 
 /// upload
 
+function elapsedStart(el) {
+  var start = +new Date;
+  el.timer = setInterval(() => {
+    el.innerText = Math.round(((+new Date) - start) / 1000) + 's';
+  }, 100);
+}
+
+function elapsedStop(el) {
+  el.timer && clearInterval(el.timer);
+  el.timer = null;
+}
+
 function uploadFile(file) {
   var list = document.getElementById('files');
   var t = {};
@@ -74,11 +86,13 @@ function uploadFile(file) {
     t.progress.value = e.loaded;
     if (e.total == e.loaded) {
       t.details.className = 'spinner';
+      elapsedStart(t.details);
     }
   });
   xhr.onreadystatechange = function(e) {
     if (xhr.readyState == 4) {
       t.progress.value = t.progress.max;
+      elapsedStop(t.details);
       t.details.className = (xhr.status == 200 ? "success" : "error");
       t.details.innerText = xhr.responseText;
     }
