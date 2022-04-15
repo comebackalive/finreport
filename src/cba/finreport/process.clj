@@ -185,7 +185,7 @@
                                  country  (get % 13)
                                  _email   (get % 7)]
                              (format "%s ***%s (%s %s)"
-                               country card amount currency))}}})
+                               country card (fmt-amount amount) currency))}}})
 
 ;;; Reading
 
