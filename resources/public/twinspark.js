@@ -891,7 +891,6 @@
 
     return xhr(fullurl, opts)
       .then(function(res) {
-        console.log(res);
         onidle(() => origins.forEach(el => {
           el.removeAttribute('aria-busy');
           el.classList.remove('ts-active')
@@ -912,7 +911,6 @@
         ERR('Something wrong with response', res.content);
       })
       .catch(function(res) {
-        console.log(res);
         onidle(() => origins.forEach(el => {
           el.removeAttribute('aria-busy');
           el.classList.remove('ts-active')

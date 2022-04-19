@@ -56,7 +56,7 @@
 
          [:h2 "Заново переобробити файли"]
          [:form {:method  "POST"
-                 :action  "/reprocess"
+                 :action  "reprocess"
                  :ts-req  ""
                  :ts-swap "afterend"}
           [:label "Введіть початок імені файлів або декілька імен (повністю) через пробіл"
