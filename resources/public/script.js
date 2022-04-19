@@ -85,13 +85,14 @@ function uploadFile(file) {
     t.progress.max = e.total;
     t.progress.value = e.loaded;
     if (e.total == e.loaded) {
-      t.details.className = 'spinner';
+      t.details.setAttribute('aria-busy', 'true');
       elapsedStart(t.details);
     }
   });
   xhr.onreadystatechange = function(e) {
     if (xhr.readyState == 4) {
       t.progress.value = t.progress.max;
+      t.details.removeAttribute('aria-busy');
       elapsedStop(t.details);
       t.details.className = (xhr.status == 200 ? "success" : "error");
       t.details.innerText = xhr.responseText;

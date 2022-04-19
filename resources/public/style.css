@@ -1,9 +1,12 @@
+body {
+  font-family: sans-serif;
+}
+
 .dropzone {
   border: 2px dashed #ccc;
   border-radius: 20px;
   width: 90vw;
   min-height: 80vh;
-  font-family: sans-serif;
   margin: 20px auto;
   padding: 20px;
 }
@@ -15,11 +18,18 @@
 .success::before { content: '✔'; color: green; }
 .error::before { content: '❌'; color: red; }
 
+/* loading indicator */
+
 @keyframes spinner {
   to { transform: rotate(360deg); }
 }
 
-.spinner:before {
+[aria-busy] {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.spinner:before, [aria-busy]::after {
   content: '';
   box-sizing: border-box;
   display: inline-block;

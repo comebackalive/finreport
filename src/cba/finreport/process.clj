@@ -138,7 +138,11 @@
 
 (def CONFIG
   {:oschad     {:start #(str/includes? % "№ п/п")
-                :skip  #(or (= (get % 13) "ТОВ \"ФК \"ЕЛАЄНС\"")
+                :skip  #(or (#{"ТОВ \"АВТО УА ГРУП\""
+                               "ТОВ \"ФК \"ЕЛАЄНС\""
+                               "Іщенко Максим Федорович"}
+                              (get % 13))
+                            (some-> (get % 13) (str/starts-with? "Повернення "))
                             ;; no date - no transaction
                             (= (get % 4) nil))
                 :fields
@@ -148,7 +152,7 @@
                  :amount  #(parse-n (get % 10))
                  :comment #(make-comment (get % 13) (get % 19))}}
    :privat     {:start #(str/includes? % "Дата проводки")
-                :skip  (constantly false)
+                :skip  #(some-> (get % 7) (str/starts-with? "Повернення "))
                 :fields
                 {:id      #(get % 0)
                  :bank    (constantly "Privat UAH")
@@ -157,9 +161,9 @@
                  :comment #(make-comment (get % 7) (get % 5))}}
    :privat-ext {:start #(str/includes? % "Дата проводки")
                 ;; be careful, it has latin i
-                :skip  #(or (str/starts-with? (get % 7) "Купiвля")
+                :skip  #(or (some-> (get % 7) (str/starts-with? "Купiвля"))
                             ;; this is when payments return
-                            (= "From for" (get % 7)))
+                            (= (get % 7) "From for"))
                 :fields
                 {:id      #(get % 0)
                  :bank    #(str "Privat " (get % 4))
@@ -318,13 +322,18 @@
       rows)))
 
 
+(def DELETE-Q
+  "delete from report
+    where bank = ?
+      and date >= ?::date
+      and date < (?::date + '1 day'::interval)")
+
+
 (defn write-db [path rows]
   (jdbc/with-transaction [tx db/conn]
     (let [fname    (file-name path)
           delres   (for [[bank d] (bank-days rows)]
-                     (db/one tx
-                       ["delete from report where bank = ? and date(date) = ?"
-                        bank d]))
+                     (db/one tx [DELETE-Q bank d d]))
           fields   [:fname :bank :date :amount :comment]
           mkrow    (fn [row]
                      [fname (:bank row) (:date row) (:amount row) (:comment row)])
@@ -350,6 +359,7 @@
 
 
 ;;; control
+
 
 (defn -main [& args]
   (let [{opts true

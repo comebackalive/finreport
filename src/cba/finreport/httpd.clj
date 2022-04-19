@@ -1,17 +1,20 @@
 (ns cba.finreport.httpd
   (:require [org.httpkit.server :as httpd]
-            [clojure.stacktrace :as st]
+            [clojure.java.io :as io]
             [hiccup2.core :as hi]
             [hiccup.page :refer [doctype]]
             [ring.util.response :as response]
             [ring.middleware.content-type :as ctype]
+            [ring.middleware.params :as params]
             [ring.middleware.multipart-params :as multipart]
             [cognitect.aws.client.api :as aws]
             [sentry-clj.ring :as sentry]
 
             [cba.config :as config]
             [cba.finreport.process :as process]
-            [clojure.java.io :as io]))
+            [cba.finreport.core :as core]
+            [clojure.string :as str]
+            [clojure.tools.logging :as log]))
 
 
 (def *s3 (aws/client {:api    :s3
@@ -22,22 +25,14 @@
   (aws/invoke *s3 {:op op :request request}))
 
 
-
-(defn exc-mw [handler]
-  (fn [req]
-    (try (handler req)
-         (catch Exception e
-           {:status  500
-            :headers {"Content-Type" "text/plain"}
-            :body    (with-out-str (st/print-stack-trace e))}))))
-
+;;; Handlers
 
 (defn static [{{:keys [path]} :path-params}]
   (-> (response/resource-response path {:root "public"})
       #_(assoc-in [:headers "Cache-Control"] "max-age=3600")))
 
 
-(defn index [req]
+(defn index [_req]
   {:status  200
    :headers {"Content-Type" "text/html"}
    :body
@@ -49,49 +44,60 @@
          [:meta {:charset "utf-8"}]
          [:link {:rel "icon" :href "data:;base64,="}]
          [:link {:rel "stylesheet" :href "static/style.css"}]
-         [:title "Upload Financial Reports"]]
+         [:title "Завантаження фінансових звітів"]]
         [:body
          [:div.dropzone
           {:ondrop      "prevent(event); drop(event)"
            :ondragover  "prevent(event)"
            :ondragenter "dragStart(event)"
            :ondragleave "dragStop(event)"}
-          [:h1 "Drop them all here"]
+          [:h1 "Скидайте їх прямо сюди"]
           [:ul#files]]
+
+         [:h2 "Заново переобробити файли"]
+         [:form {:method  "POST"
+                 :action  "/reprocess"
+                 :ts-req  ""
+                 :ts-swap "afterend"}
+          [:label "Введіть початок імені файлів або декілька імен (повністю) через пробіл"
+           [:input {:type "text" :name "fname"}]]
+          [:br]
+          [:input {:type "submit" :value "Запуск"}]]
+
+         [:script {:src          "static/twinspark.js"
+                   :data-timeout "600000"}]
          [:script {:src "static/script.js"}]]]))})
 
 
-(defn human-bytes
-  "https://stackoverflow.com/questions/3758606#answer-24805871"
-  [^long v]
-  (if (< v 1024)
-    (str v "B")
-    (let [z (-> (- 63 (Long/numberOfLeadingZeros v))
-                (/ 10))]
-      (format "%.1f%sB"
-        (/ (double v) (bit-shift-left 1 (* (int z) 10)))
-        (.charAt " KMGTPE" z)))))
+
+(defn track-process [f cb]
+  (let [start (System/currentTimeMillis)
+        cnt   (process/process-and-store :db (:filename f) (:tempfile f))
+        res   (cb (:filename f) (:tempfile f))
+        total (- (System/currentTimeMillis) start)]
+    (format
+      "Size: %s, rows with data: %s (was %s), archived: %s, took %sms"
+      (core/human-bytes (:size f))
+      (:inserted cnt)
+      (:deleted cnt)
+      res
+      total)))
 
 
 (defn upload [req]
   (try
-    (let [start (System/currentTimeMillis)
-          f     (get-in req [:multipart-params "file"])
-          cnt   (process/process-and-store :db (:filename f) (:tempfile f))
-          res   (let [ba (-> (:tempfile f) io/input-stream .readAllBytes)]
-                  (s3 :PutObject {:Bucket ARCHIVE
-                                  :Key    (process/file-name (:filename f))
-                                  :Body   ba}))
-          total (- (System/currentTimeMillis) start)]
+    (let [f    (get-in req [:multipart-params "file"])
+          info (track-process f
+                 (fn [fname file]
+                   (let [ba (-> file io/input-stream .readAllBytes)]
+                     (-> (s3 :PutObject {:Bucket ARCHIVE
+                                         :Key    (process/file-name fname)
+                                         :Body   ba})
+                         :ETag
+                         boolean))))]
       {:status  200
        :headers {"Content-Type" "text/plain"}
-       :body    (format
-                  "Size: %s, rows with data: %s (was %s), archived: %s, took %sms"
-                  (human-bytes (:size f))
-                  (:inserted cnt)
-                  (:deleted cnt)
-                  (boolean (:ETag res))
-                  total)})
+       :body    info})
     (catch Exception e
       (if (ex-data e)
         {:status  400
@@ -100,15 +106,42 @@
         (throw e)))))
 
 
-(defn reprocess [& fnames]
-  (doseq [fname (or (seq fnames)
-                    (->> (:Contents
-                          (s3 :ListObjectsV2 {:Bucket ARCHIVE}))
-                         (map :Key)))
-          :let [data (s3 :GetObject {:Bucket ARCHIVE
-                                     :Key    fname})]]
-    (time (process/process-and-store :db fname (:Body data)))))
+(defn reprocess [req]
+  (let [fnames (-> req :params (get "fname" "") (str/split #" "))
+        fnames (cond
+                 (= fnames [""]) []
 
+                 (= (count fnames) 1)
+                 (->> (:Contents
+                       (s3 :ListObjectsV2 {:Bucket ARCHIVE
+                                           :Prefix (first fnames)}))
+                      (map :Key))
+
+                 :else fnames)
+        _   (log/info "Reprocessing" fnames)
+        res (into []
+              (for [fname fnames
+                    :let  [data (s3 :GetObject {:Bucket ARCHIVE
+                                                :Key    fname})]]
+                (track-process {:filename fname
+                                :tempfile (:Body data)
+                                :size     (:ContentLength data)}
+                  (constantly false))))]
+    (prn res)
+    {:status  200
+     :headers {"Content-Type" "text/html"}
+     :body    (str
+                (hi/html
+                  [:div
+                   (for [info res]
+                     [:p {} info])]))}))
+
+
+(defn manual [req]
+  nil)
+
+
+;;; Routing/app
 
 (defn mk-handler [req func & names]
   (fn [m]
@@ -119,6 +152,8 @@
   (or (condp re-find (:uri req)
         #"^/static/(.*)" :>> (mk-handler req static :path)
         #"^/upload"      :>> (mk-handler req upload)
+        #"^/reprocess"   :>> (mk-handler req reprocess)
+        #"^/manual"      :>> (mk-handler req manual)
         #"^/$"           :>> (mk-handler req index)
         nil)
       {:status  404
@@ -133,8 +168,9 @@
 (defn make-app []
   (cond-> -app
     true            (ctype/wrap-content-type)
+    true            (params/wrap-params)
     true            (multipart/wrap-multipart-params)
-    (config/DEV)    exc-mw
+    (config/DEV)    core/exc-mw
     (config/SENTRY) (sentry/wrap-report-exceptions nil)))
 
 
