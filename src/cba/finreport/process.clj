@@ -54,7 +54,7 @@
 
 ;;; Cleaning
 
-(def BANKS
+(def TRASH-SENDER
   #{"АТ «ПУМБ»"
     "ПАТ «БАНК ВОСТОК»"
     "АТ \"Райффайзен Банк\""
@@ -77,7 +77,7 @@
 
 (defn maybe-drop-sender [s]
   (when-not (or (not s)
-                (contains? BANKS s)
+                (contains? TRASH-SENDER s)
                 (re-find TRASH-SENDER-RE s))
     s))
 
@@ -189,7 +189,30 @@
                                  country  (get % 13)
                                  _email   (get % 7)]
                              (format "%s ***%s (%s %s)"
-                               country card (fmt-amount amount) currency))}}})
+                               country card (fmt-amount amount) currency))}}
+   :cash       {:start #(str/includes? % "Тип надходження")
+                :skip  (constantly false)
+                :fields
+                {:id      (constantly "")
+                 :bank    (constantly "Cash")
+                 :date    #(dt (get % 0))
+                 :amount  #(parse-n (get % 1))
+                 :comment #(get % 2)}}})
+
+
+(defn detect-bank [data]
+  (let [rows (into [] (take 5 data))
+        g    (fn [x y] (some-> (get-in rows [x y]) str/trim))]
+    (cond
+      (= (g 0 0) "Внутрішній ID")                     :fondy
+      (= (g 0 0) "Назва Клієнта")                     :oschad
+      (= (g 1 6) "Сума еквівалент у гривні")          :privat-ext
+      (str/starts-with? (g 0 0) "Виписка по рахунку") :privat
+      (and (= (g 0 2) "Тип надходження")
+           (= (g 1 2) "готівка"))                     :cash
+      :else
+      (throw (ex-info "Unknown bank!" {:rows rows})))))
+
 
 ;;; Reading
 
@@ -253,16 +276,10 @@
                {:row row :i i} e)))))
 
 
-(defn detect-bank [data]
-  (let [rows (into [] (take 5 data))
-        g    (fn [x y] (some-> (get-in rows [x y]) str/trim))]
-    (cond
-      (= (g 0 0) "Внутрішній ID")                     :fondy
-      (= (g 0 0) "Назва Клієнта")                     :oschad
-      (= (g 1 6) "Сума еквівалент у гривні")          :privat-ext
-      (str/starts-with? (g 0 0) "Виписка по рахунку") :privat
-      :else
-      (throw (ex-info "Unknown bank!" {:rows rows})))))
+(defn nothing? [v]
+  (if (seq? v)
+    (empty? v)
+    (nil? v)))
 
 
 (defn process [path content]
@@ -279,8 +296,8 @@
          skip-fn  :skip
          fields   :fields} (get CONFIG bank)
         xf                 (comp
-                             (remove #(or (empty? (first %))
-                                          (< (count %) 5)
+                             (remove #(or (nothing? (first %))
+                                          (< (count %) 3)
                                           (skip-fn %)))
                              (map-indexed (partial parse-row fields))
                              (remove #(or (nil? (:amount %))
