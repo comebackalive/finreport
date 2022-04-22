@@ -77,25 +77,24 @@
         res    (process/process-and-store :db (:filename f) (:tempfile f))
         cb-res (cb (:filename f) (:tempfile f))
         total  (- (System/currentTimeMillis) start)]
-    (str
-      (hi/html
-        [:div
-         (format
-           "Банк %s, розмір файлу %s, збережено в архіві: %s, зайняло %sмс"
-           (name (:bank res))
-           (core/human-bytes (:size f))
-           cb-res
-           total)
-         [:details
-          [:summary
-           (format "Завантажено %s рядків, було в базі %s, пропущені (%s):"
-             (:inserted res)
-             (:deleted res)
-             (count (:skipped res)))]
-          [:table.skipped
-           (for [row (:skipped res)]
-             [:tr (for [cell row]
-                    [:td cell])])]]]))))
+    (hi/html
+      [:div
+       (format
+         "Банк %s, розмір файлу %s, збережено в архіві: %s, зайняло %sмс"
+         (name (:bank res))
+         (core/human-bytes (:size f))
+         cb-res
+         total)
+       [:details
+        [:summary
+         (format "Завантажено %s рядків, було в базі %s, пропущені (%s):"
+           (:inserted res)
+           (:deleted res)
+           (count (:skipped res)))]
+        [:table.skipped
+         (for [row (:skipped res)]
+           [:tr (for [cell row]
+                  [:td cell])])]]])))
 
 
 (defn upload [req]
@@ -111,7 +110,7 @@
                          boolean))))]
       {:status  200
        :headers {"Content-Type" "text/html"}
-       :body    info})
+       :body    (str info)})
     (catch Exception e
       (if (ex-data e)
         (do
