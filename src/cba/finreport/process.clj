@@ -136,6 +136,9 @@
     amount))
 
 
+(def ^:dynamic *currency* "oschad-ext currency" nil)
+
+
 (def CONFIG
   {:oschad     {:start #(str/includes? % "№ п/п")
                 :skip  #(or (#{"ТОВ \"АВТО УА ГРУП\""
@@ -151,6 +154,21 @@
                  :date    #(dt (date (get % 4)))
                  :amount  #(parse-n (get % 10))
                  :comment #(make-comment (get % 13) (get % 19))}}
+   :oschad-ext {:start    #(str/includes? % "№ п/п")
+                :skip     #(nil? (get % 1))
+                :currency (fn [lazy-rows]
+                            (->> (get (nth lazy-rows 5) 4)
+                                 (re-find #"\((\w+)\)")
+                                 second))
+                :fields
+                {:id      #(get % 1)
+                 :bank    (fn [_] (str "Oschad " *currency*))
+                 :date    #(dt (date (get % 3)))
+                 :amount  #(parse-n (get % 14))
+                 :comment #(let [msg    (cleanup-ext (get % 24))
+                                 amount (get % 12)]
+                             (format "%s (%s %s)"
+                               msg (fmt-amount amount) *currency*))}}
    :privat     {:start #(str/includes? % "Дата проводки")
                 :skip  #(some-> (get % 7) (str/starts-with? "Повернення "))
                 :fields
@@ -161,9 +179,10 @@
                  :comment #(make-comment (get % 7) (get % 5))}}
    :privat-ext {:start #(str/includes? % "Дата проводки")
                 ;; be careful, it has latin i
-                :skip  #(or (some-> (get % 7) (str/starts-with? "Купiвля"))
-                            ;; this is when payments return
-                            (= (get % 7) "From for"))
+                :skip  #(let [msg (get % 7)]
+                          (or (= msg "From for") ; this is when payments return
+                              (some-> msg (str/starts-with? "Купiвля"))
+                              (some-> msg (str/includes? "технiчне проведення усунення розбалансу"))))
                 :fields
                 {:id      #(get % 0)
                  :bank    #(str "Privat " (get % 4))
@@ -201,10 +220,11 @@
 
 
 (defn detect-bank [data]
-  (let [rows (into [] (take 5 data))
-        g    (fn [x y] (some-> (get-in rows [x y]) str/trim))]
+  (let [rows (into [] (take 15 data))
+        g    (fn [x y] (some-> (get-in rows [x y]) str str/trim))]
     (cond
       (= (g 0 0) "Внутрішній ID")                     :fondy
+      (= (g 10 14) "КТ рахунку (еквівалент)")         :oschad-ext
       (= (g 0 0) "Назва Клієнта")                     :oschad
       (= (g 1 6) "Сума еквівалент у гривні")          :privat-ext
       (str/starts-with? (g 0 0) "Виписка по рахунку") :privat
@@ -243,6 +263,7 @@
                        (.getNumericCellValue cell))
     CellType/STRING  (.getStringCellValue cell)
     CellType/BLANK   nil
+    CellType/FORMULA nil
     (throw (ex-info "Unknown cell type" {:type (.getCellType cell)}))))
 
 
@@ -264,22 +285,27 @@
 
 ;;; Convert
 
-(defn parse-row [fields i row]
-  (try
-    (reduce-kv (fn [acc k getter]
-                 (let [value (getter row)]
-                   (assoc acc k value)))
-      {}
-      fields)
-    (catch Exception e
-      (throw (ex-info (str "Error parsing row: " (str e))
-               {:row row :i i} e)))))
+(defn parse-row [fields currency i row]
+  (binding [*currency* currency]
+    (try
+      (reduce-kv (fn [acc k getter]
+                   (let [value (getter row)]
+                     (assoc acc k value)))
+        {}
+        fields)
+      (catch Exception e
+        (throw (ex-info (str "Error parsing row: " (str e))
+                 {:row row :i i}
+                 e))))))
 
 
 (defn nothing? [v]
   (if (seq? v)
     (empty? v)
     (nil? v)))
+
+
+(defn reporting-remove [])
 
 
 (defn process [path content]
@@ -290,23 +316,38 @@
                       :else
                       (throw (ex-info "Unknown file format"
                                {:path path})))
+        bank    (detect-bank rows)
 
-        bank               (detect-bank rows)
-        {start-fn :start
-         skip-fn  :skip
-         fields   :fields} (get CONFIG bank)
-        xf                 (comp
-                             (remove #(or (nothing? (first %))
-                                          (< (count %) 3)
-                                          (skip-fn %)))
-                             (map-indexed (partial parse-row fields))
-                             (remove #(or (nil? (:amount %))
-                                          (neg? (:amount %)))))]
+        {start-fn    :start
+         skip-fn     :skip
+         currency-fn :currency
+         fields      :fields} (get CONFIG bank)
+        currency              (when currency-fn
+                                (currency-fn rows))
+        *skipped              (atom [])
+
+        func (fn [i row]
+               (let [skip? (or (nothing? (first row))
+                               (< (count row) 3)
+                               (skip-fn row))
+                     res   (when-not skip?
+                             (parse-row fields currency i row))]
+                 (if-not (or (nil? (:amount res))
+                             (neg? (:amount res)))
+                   res
+                   (do
+                     (swap! *skipped conj row)
+                     nil))))
+        xf   (comp
+               (map-indexed func)
+               (remove nil?))]
     (printf "Parsing %s from %s...\n" bank path)
-    (->> rows
-         (drop-while #(not (start-fn %)))
-         rest
-         (sequence xf))))
+    {:bank    bank
+     :data    (->> rows
+                   (drop-while #(not (start-fn %)))
+                   rest
+                   (into [] xf))
+     :skipped @*skipped}))
 
 ;;; Storing
 
@@ -370,9 +411,9 @@
                    :db  write-db
                    :csv write-csv)
         data     (process path content)
-        res      (write-fn path data)]
+        res      (write-fn path (:data data))]
     (log/info "Processing finished" path)
-    res))
+    (merge res (dissoc data :data))))
 
 
 ;;; control

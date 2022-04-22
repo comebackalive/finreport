@@ -71,3 +71,26 @@ p {
 #fileElem {
   display: none;
 }
+
+
+table.skipped {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+table.skipped td {
+  border: 1px solid #ddd;
+  padding: 8px;
+}
+
+table.skipped tr:nth-child(even) {
+  background-color: #f2f2f2;
+}
+
+table.skipped tr:nth-child(odd) {
+  background-color: #ddd;
+}
+
+table.skipped tr:hover {
+  background-color: #ddd;
+}

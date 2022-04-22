@@ -7,7 +7,7 @@
             [sentry-clj.core :as sentry]
 
             [cba.config :as config]
-            [cba.finreport.httpd :as httpd]))
+            [cba.finreport.httpd]))
 
 
 (set! *warn-on-reflection* true)
@@ -22,10 +22,6 @@
 (when (seq (config/SENTRY))
   (sentry/init! (config/SENTRY) {:release VERSION
                                  :in-app-includes ["uapatron"]}))
-
-(mount/defstate httpd
-  :start (httpd/start)
-  :stop (httpd))
 
 
 (defn -main [& args]

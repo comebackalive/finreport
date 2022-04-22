@@ -95,7 +95,7 @@ function uploadFile(file) {
       t.details.removeAttribute('aria-busy');
       elapsedStop(t.details);
       t.details.className = (xhr.status == 200 ? "success" : "error");
-      t.details.innerText = xhr.responseText;
+      t.details.innerHTML = xhr.responseText;
     }
   };
   xhr.open('POST', 'upload', true);

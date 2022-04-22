@@ -14,7 +14,9 @@
             [cba.finreport.process :as process]
             [cba.finreport.core :as core]
             [clojure.string :as str]
-            [clojure.tools.logging :as log]))
+            [clojure.tools.logging :as log]
+            [mount.core :as mount]
+            [clojure.stacktrace :as st]))
 
 
 (def *s3 (aws/client {:api    :s3
@@ -71,17 +73,29 @@
 
 
 (defn track-process [f cb]
-  (let [start (System/currentTimeMillis)
-        cnt   (process/process-and-store :db (:filename f) (:tempfile f))
-        res   (cb (:filename f) (:tempfile f))
-        total (- (System/currentTimeMillis) start)]
-    (format
-      "Size: %s, rows with data: %s (was %s), archived: %s, took %sms"
-      (core/human-bytes (:size f))
-      (:inserted cnt)
-      (:deleted cnt)
-      res
-      total)))
+  (let [start  (System/currentTimeMillis)
+        res    (process/process-and-store :db (:filename f) (:tempfile f))
+        cb-res (cb (:filename f) (:tempfile f))
+        total  (- (System/currentTimeMillis) start)]
+    (str
+      (hi/html
+        [:div
+         (format
+           "Банк %s, розмір файлу %s, збережено в архіві: %s, зайняло %sмс"
+           (name (:bank res))
+           (core/human-bytes (:size f))
+           cb-res
+           total)
+         [:details
+          [:summary
+           (format "Завантажено %s рядків, було в базі %s, пропущені (%s):"
+             (:inserted res)
+             (:deleted res)
+             (count (:skipped res)))]
+          [:table.skipped
+           (for [row (:skipped res)]
+             [:tr (for [cell row]
+                    [:td cell])])]]]))))
 
 
 (defn upload [req]
@@ -96,13 +110,17 @@
                          :ETag
                          boolean))))]
       {:status  200
-       :headers {"Content-Type" "text/plain"}
+       :headers {"Content-Type" "text/html"}
        :body    info})
     (catch Exception e
       (if (ex-data e)
-        {:status  400
-         :headers {"Content-Type" "text/plain"}
-         :body    (str (.getMessage e) ": " (pr-str (ex-data e)))}
+        (do
+          (st/print-stack-trace e)
+          {:status  400
+           :headers {"Content-Type" "text/html"}
+           :body    (str "<pre>"
+                      (.getMessage e) ": " (pr-str (ex-data e))
+                      "</pre>")})
         (throw e)))))
 
 
@@ -127,7 +145,6 @@
                                 :tempfile (:Body data)
                                 :size     (:ContentLength data)}
                   (constantly false))))]
-    (prn res)
     {:status  200
      :headers {"Content-Type" "text/html"}
      :body    (str
@@ -135,10 +152,6 @@
                   [:div
                    (for [info res]
                      [:p {} info])]))}))
-
-
-(defn manual [req]
-  nil)
 
 
 ;;; Routing/app
@@ -153,7 +166,6 @@
         #"^/static/(.*)" :>> (mk-handler req static :path)
         #"^/upload"      :>> (mk-handler req upload)
         #"^/reprocess"   :>> (mk-handler req reprocess)
-        #"^/manual"      :>> (mk-handler req manual)
         #"^/$"           :>> (mk-handler req index)
         nil)
       {:status  404
@@ -179,3 +191,8 @@
     (println (str "Listening to http://127.0.0.1:" port))
     (httpd/run-server (make-app) {:port     port
                                   :max-body (* 30 1024 1024)})))
+
+
+(mount/defstate httpd
+  :start (start)
+  :stop (httpd))
