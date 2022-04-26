@@ -1,6 +1,10 @@
 (ns cba.finreport.httpd
   (:require [org.httpkit.server :as httpd]
             [clojure.java.io :as io]
+            [clojure.string :as str]
+            [clojure.tools.logging :as log]
+            [clojure.stacktrace :as st]
+            [mount.core :as mount]
             [hiccup2.core :as hi]
             [hiccup.page :refer [doctype]]
             [ring.util.response :as response]
@@ -11,12 +15,8 @@
             [sentry-clj.ring :as sentry]
 
             [cba.config :as config]
-            [cba.finreport.process :as process]
-            [cba.finreport.core :as core]
-            [clojure.string :as str]
-            [clojure.tools.logging :as log]
-            [mount.core :as mount]
-            [clojure.stacktrace :as st]))
+            [cba.core :as core]
+            [cba.finreport.process :as process]))
 
 
 (def *s3 (aws/client {:api    :s3

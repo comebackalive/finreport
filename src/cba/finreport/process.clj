@@ -145,7 +145,7 @@
                                "ТОВ \"ФК \"ЕЛАЄНС\""
                                "Іщенко Максим Федорович"}
                               (get % 13))
-                            (some-> (get % 13) (str/starts-with? "Повернення "))
+                            (some-> (get % 19) (str/starts-with? "Повернення "))
                             ;; no date - no transaction
                             (= (get % 4) nil))
                 :fields
