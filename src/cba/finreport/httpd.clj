@@ -61,7 +61,7 @@
                  :action  "reprocess"
                  :ts-req  ""
                  :ts-swap "afterend"}
-          [:label "Введіть початок імені файлів або декілька імен (повністю) через пробіл"
+          [:label "Введіть ім'я файлу або його початок"
            [:input {:type "text" :name "fname"}]]
           [:br]
           [:input {:type "submit" :value "Запуск"}]]
@@ -81,7 +81,7 @@
       [:div
        "Банк " (name (:bank res)) ", "
        "файл " [:a {:href (str "download/" (:filename f))} (:filename f)]
-       (format "(%s)," (core/human-bytes (:size f)))
+       (format "(%s), " (core/human-bytes (:size f)))
        (format "збережено в архіві: %s, зайняло %sмс"
          cb-res
          total)

@@ -7,7 +7,9 @@
             [sentry-clj.core :as sentry]
 
             [cba.config :as config]
-            [cba.finreport.httpd]))
+            [cba.finreport
+             httpd
+             schedule]))
 
 
 (set! *warn-on-reflection* true)

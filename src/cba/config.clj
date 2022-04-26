@@ -24,11 +24,22 @@
 (def PORT          #(-> (get-env "PORT" "2323"
                           "port to start on")
                       str/trim
-                      Integer/parseInt))
+                      Long.))
 (def BUCKET-PREFIX #(-> (get-env "BUCKET_PREFIX" ""
                           "prefix for S3 bucket names")))
 (def PGURL         #(get-env "PGURL"
                       "PostgreSQL URL"))
 (def SENTRY        #(get-env "SENTRY" ""
                       "Sentry DSN"))
-
+(def FONDY-ID      #(get-env "FONDYID"
+                      "Fondy merchant id"))
+(def FONDY-KEY     #(get-env "FONDYKEY"
+                      "Fondy merchant key"))
+(def FONDY-APP-ID  #(get-env "FONDY_APP_ID"
+                      "Fondy application id"))
+(def FONDY-APP-KEY #(get-env "FONDY_APP_KEY"
+                      "Fondy application key"))
+(def TIMEOUT       #(-> (get-env "TIMEOUT" "60000"
+                          "HTTP timeout")
+                        str/trim
+                        Long.))

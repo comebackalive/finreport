@@ -19,13 +19,19 @@
 
 (def dt-fmt (DateTimeFormatter/ofPattern "dd.MM.yyyy HH:mm:ss"))
 (def fondy-dt-fmt (DateTimeFormatter/ofPattern "dd.MM.yy HH:mm:ss"))
+(def fondy2-dt-fmt (DateTimeFormatter/ofPattern "yyyy-MM-dd HH:mm:ss"))
 (def date-fmt (DateTimeFormatter/ofPattern "dd.MM.yyyy"))
 
 (defn dt [s]
   (cond
-    (string? s)             (try (LocalDateTime/parse s dt-fmt)
-                                 (catch DateTimeParseException _
-                                   (LocalDateTime/parse s fondy-dt-fmt)))
+    (string? s)             (loop [fmts [dt-fmt
+                                         fondy2-dt-fmt
+                                         fondy-dt-fmt]]
+                              (when (seq fmts)
+                                (or (try
+                                      (LocalDateTime/parse s (first fmts))
+                                      (catch DateTimeParseException _))
+                                    (recur (rest fmts)))))
     (instance? LocalDate s) (.atStartOfDay ^LocalDate s)
     :else                   s))
 
