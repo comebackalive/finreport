@@ -54,6 +54,9 @@
 
 ;;; Cleaning
 
+(def OWN-ACCOUNTS #{"UA223226690000026007300905964"})
+
+
 (def TRASH-SENDER
   #{"АТ «ПУМБ»"
     "ПАТ «БАНК ВОСТОК»"
@@ -171,7 +174,8 @@
                              (format "%s (%s %s)"
                                msg (fmt-amount amount) *currency*))}}
    :privat     {:start #(str/includes? % "Дата проводки")
-                :skip  #(some-> (get % 7) (str/starts-with? "Повернення "))
+                :skip  #(or (some-> (get % 7) (str/starts-with? "Повернення "))
+                            (contains? OWN-ACCOUNTS (get % 8)))
                 :fields
                 {:id      #(get % 0)
                  :bank    (constantly "Privat UAH")
