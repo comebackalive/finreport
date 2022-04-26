@@ -1,7 +1,6 @@
 (ns cba.finreport.httpd
   (:require [org.httpkit.server :as httpd]
             [clojure.java.io :as io]
-            [clojure.string :as str]
             [clojure.tools.logging :as log]
             [clojure.stacktrace :as st]
             [mount.core :as mount]
@@ -16,7 +15,8 @@
 
             [cba.config :as config]
             [cba.core :as core]
-            [cba.finreport.process :as process]))
+            [cba.finreport.process :as process]
+            [ring.util.codec :as codec]))
 
 
 (def *s3 (aws/client {:api    :s3
@@ -79,10 +79,10 @@
         total  (- (System/currentTimeMillis) start)]
     (hi/html
       [:div
-       (format
-         "Банк %s, розмір файлу %s, збережено в архіві: %s, зайняло %sмс"
-         (name (:bank res))
-         (core/human-bytes (:size f))
+       "Банк " (name (:bank res)) ", "
+       "файл " [:a {:href (str "download/" (:filename f))} (:filename f)]
+       (format "(%s)," (core/human-bytes (:size f)))
+       (format "збережено в архіві: %s, зайняло %sмс"
          cb-res
          total)
        [:details
@@ -123,34 +123,48 @@
         (throw e)))))
 
 
+(defn download [req]
+  (let [path (-> req :path-params :path codec/url-decode)
+        obj  (s3 :GetObject {:Bucket ARCHIVE
+                             :Key    path})]
+    (prn obj)
+    (if (:Error obj)
+      {:status  404
+       :headers {"Content-Type" "text/plain"}
+       :body    "Not Found"}
+      {:status  200
+       :headers {"Content-Disposition" (format "attachment; filename=\"%s\""
+                                         (process/file-name path))
+                 "Content-Length"      (:ContentLength obj)}
+       :body    (:Body obj)})))
+
+
 (defn reprocess [req]
-  (let [fnames (-> req :params (get "fname" "") (str/split #" "))
-        fnames (cond
-                 (= fnames [""]) []
-
-                 (= (count fnames) 1)
-                 (->> (:Contents
-                       (s3 :ListObjectsV2 {:Bucket ARCHIVE
-                                           :Prefix (first fnames)}))
-                      (map :Key))
-
-                 :else fnames)
-        _   (log/info "Reprocessing" fnames)
-        res (into []
-              (for [fname fnames
-                    :let  [data (s3 :GetObject {:Bucket ARCHIVE
-                                                :Key    fname})]]
-                (track-process {:filename fname
-                                :tempfile (:Body data)
-                                :size     (:ContentLength data)}
-                  (constantly false))))]
-    {:status  200
-     :headers {"Content-Type" "text/html"}
-     :body    (str
-                (hi/html
-                  [:div
-                   (for [info res]
-                     [:p {} info])]))}))
+  (if-let [fname (-> req :params (get "fname") not-empty)]
+    (let [fnames (when (not-empty fname)
+                   (->> (:Contents
+                         (s3 :ListObjectsV2 {:Bucket ARCHIVE
+                                             :Prefix fname}))
+                        (map :Key)))
+          _      (log/info "Reprocessing" fnames)
+          res    (into []
+                   (for [fname fnames
+                         :let  [data (s3 :GetObject {:Bucket ARCHIVE
+                                                     :Key    fname})]]
+                     (track-process {:filename fname
+                                     :tempfile (:Body data)
+                                     :size     (:ContentLength data)}
+                       (constantly false))))]
+      {:status  200
+       :headers {"Content-Type" "text/html"}
+       :body    (str
+                  (hi/html
+                    [:div
+                     (for [info res]
+                       [:p {} info])]))})
+    {:status  400
+     :headers {"Content-Type" "text/plain"}
+     :body    "Please supply file name"}))
 
 
 ;;; Routing/app
@@ -162,10 +176,11 @@
 
 (defn router [req]
   (or (condp re-find (:uri req)
-        #"^/static/(.*)" :>> (mk-handler req static :path)
-        #"^/upload"      :>> (mk-handler req upload)
-        #"^/reprocess"   :>> (mk-handler req reprocess)
-        #"^/$"           :>> (mk-handler req index)
+        #"^/static/(.*)"   :>> (mk-handler req static :path)
+        #"^/upload"        :>> (mk-handler req upload)
+        #"^/download/(.*)" :>> (mk-handler req download :path)
+        #"^/reprocess"     :>> (mk-handler req reprocess)
+        #"^/$"             :>> (mk-handler req index)
         nil)
       {:status  404
        :headers {"Content-Type" "text/plain"}

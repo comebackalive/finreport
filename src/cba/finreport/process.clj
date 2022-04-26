@@ -145,7 +145,7 @@
                                "ТОВ \"ФК \"ЕЛАЄНС\""
                                "Іщенко Максим Федорович"}
                               (get % 13))
-                            (some-> (get % 19) (str/starts-with? "Повернення "))
+                            (some-> (get % 19) (str/starts-with? "Повернення коштів"))
                             ;; no date - no transaction
                             (= (get % 4) nil))
                 :fields
@@ -155,7 +155,8 @@
                  :amount  #(parse-n (get % 10))
                  :comment #(make-comment (get % 13) (get % 19))}}
    :oschad-ext {:start    #(str/includes? % "№ п/п")
-                :skip     #(nil? (get % 1))
+                :skip     #(or (nil? (get % 1))
+                               (some-> (get % 24) (str/starts-with? "Повернення коштів")))
                 :currency (fn [lazy-rows]
                             (->> (get (nth lazy-rows 5) 4)
                                  (re-find #"\((\w+)\)")
