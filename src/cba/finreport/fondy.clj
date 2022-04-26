@@ -75,18 +75,31 @@
       :token))
 
 
+(defn parse-order-id [oid]
+  (let [tags    (re-seq #"#([^-]+)" oid)
+        hiddens (re-seq #"!([^-]+)" oid)]
+    {:sub     (str/starts-with? oid "SUB-")
+     :tags    (some->> (not-empty (mapv second tags))
+                (into-array String))
+     :hiddens (some->> (not-empty (mapv second hiddens))
+                (into-array String ))}))
+
+
 (defn report->row [src]
-  {:id      (:order_id src)
-   :bank    (if (str/starts-with? (:order_id src) "SUB-")
-             "Fondy Sub"
-             "Fondy")
-   :date    (process/dt (:order_timestart src))
-   :amount  (process/parse-n (:settlement_amount src))
-   :comment (format "%s ***%s (%s %s)"
-              (:order_desc src)
-              (last (str/split (:masked_card src) #"\*"))
-              (:amount src)
-              (:currency src))})
+  (let [data (parse-order-id (:order_id src))]
+    {:id      (:order_id src)
+     :bank    (if (:sub data)
+                "Fondy Sub"
+                "Fondy")
+     :date    (process/dt (:order_timestart src))
+     :amount  (process/parse-n (:settlement_amount src))
+     :comment (format "%s ***%s (%s %s)"
+                (:order_desc src)
+                (last (str/split (:masked_card src) #"\*"))
+                (:amount src)
+                (:currency src))
+     :tags    (:tags data)
+     :hiddens (:hiddens data)}))
 
 
 (defn get-report [{:keys [from to onpage]
@@ -126,6 +139,6 @@
 
 
 (comment
-  (def q (get-report {:from "2022-04-24" :to "2022-04-24"}))
+  (def q (get-report {:from "2022-04-26" :to "2022-04-26"}))
 
   (process/write-db "fondy api" q))

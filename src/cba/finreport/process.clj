@@ -403,9 +403,10 @@
     (let [fname    (file-name path)
           delres   (for [[bank d] (bank-days rows)]
                      (db/one tx [DELETE-Q bank d d]))
-          fields   [:fname :bank :date :amount :comment]
+          fields   [:fname :bank :date :amount :comment :tags :hiddens]
           mkrow    (fn [row]
-                     [fname (:bank row) (:date row) (:amount row) (:comment row)])
+                     [fname (:bank row) (:date row) (:amount row) (:comment row)
+                      (:tags row) (:hiddens row)])
           insres   (for [batch (partition-all 1000 rows)]
                      (->> batch
                           (map mkrow)

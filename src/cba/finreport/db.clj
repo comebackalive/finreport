@@ -1,10 +1,12 @@
 (ns cba.finreport.db
   (:import [java.net URI]
+           [java.sql Array PreparedStatement]
            [org.postgresql.ds PGSimpleDataSource])
   (:require [clojure.string :as str]
             [mount.core :as mount]
             [ring.util.codec :as codec]
             [next.jdbc :as jdbc]
+            [next.jdbc.prepare :as jdbc-p]
             [next.jdbc.result-set :as jdbc-rs]
             [next.jdbc.date-time :as jdbc-dt]
             [ragtime.jdbc]
@@ -69,3 +71,17 @@
 (defn one
   ([query] (first (q query)))
   ([conn query] (first (q conn query))))
+
+
+;;; Extensions
+
+(extend-protocol jdbc-rs/ReadableColumn
+  Array
+  (read-column-by-label [^Array v _]    (vec (.getArray v)))
+  (read-column-by-index [^Array v _ _]  (vec (.getArray v))))
+
+
+(extend-protocol jdbc-p/SettableParameter
+  clojure.lang.PersistentVector
+  (set-parameter [v ^PreparedStatement s ^long i]
+    (.setArray s i v)))
