@@ -82,7 +82,9 @@
                 "Fondy Sub"
                 "Fondy")
      :date    (process/dt (:order_timestart src))
-     :amount  (process/parse-n (:settlement_amount src))
+     :amount  (or (process/parse-n (:settlement_amount src))
+                  ;; embed commission, newer tx dont have settlement_amount yet
+                  (* 0.979 (process/parse-n (:actual_amount src))))
      :comment (format "%s ***%s (%s %s)"
                 (:order_desc src)
                 (last (str/split (:masked_card src) #"\*"))
@@ -116,19 +118,17 @@
                  :vf    (fn [res]
                           (let [fields (mapv keyword (:fields res))]
                             (map #(zipmap fields %) (:data res))))})]
-    (into []
-      (comp cat (map report->row))
-      res)))
+    (into [] cat res)))
 
 
 (defn cron []
   (let [d   (LocalDate/now)
         res (get-report {:from (str (.minusDays d 1))
                          :to   (str d)})]
-    (process/write-db "fondy api" res)))
+    (process/write-db "fondy api" (map report->row res))))
 
 
 (comment
-  (def q (get-report {:from "2022-04-26" :to "2022-04-26"}))
+  (def q (get-report {:from "2022-04-27" :to "2022-04-27"}))
 
   (process/write-db "fondy api" q))
