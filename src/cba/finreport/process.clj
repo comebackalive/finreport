@@ -178,7 +178,7 @@
                                "Іщенко Максим Федорович"}
                               (get % 13))
                             (some-> (get % 19) (str/starts-with? "Повернення коштів"))
-                            (some-> (get % 19) (str/starts-with? "Кред.заб. за прийн.плат."))
+                            (some-> (get % 13) (str/starts-with? "Кред.заб."))
                             ;; no date - no transaction
                             (= (get % 4) nil))
                 :fields
@@ -471,6 +471,7 @@
       (process-and-store mode path nil))))
 
 (comment
+  (def x (read-xls (io/file "/Users/piranha/Downloads/БФ_ощад_грн_1-24 квітня.Xlsx")))
   (def x (process "/Users/piranha/dev/misc/pzh-finance/clj-finreport/49949__1622114.xlsx" nil))
 
   (time (write-db "49949__1622114.xlsx" x))
