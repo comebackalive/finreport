@@ -75,18 +75,8 @@
       :token))
 
 
-(defn parse-order-id [oid]
-  (let [tags    (re-seq #"#([^-]+)" oid)
-        hiddens (re-seq #"!([^-]+)" oid)]
-    {:sub     (str/starts-with? oid "SUB-")
-     :tags    (some->> (not-empty (mapv second tags))
-                (into-array String))
-     :hiddens (some->> (not-empty (mapv second hiddens))
-                (into-array String ))}))
-
-
 (defn report->row [src]
-  (let [data (parse-order-id (:order_id src))]
+  (let [data (process/parse-card-oid (:order_id src))]
     {:id      (:order_id src)
      :bank    (if (:sub data)
                 "Fondy Sub"

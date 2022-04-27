@@ -58,6 +58,29 @@
                        (str/replace s #"[ ,]" ""))
         (throw (Exception. (str "cannot parse number " s)))))))
 
+
+(defn parse-card-oid
+  "Parses order id from card system to get various props.
+
+  Order id should be of format:
+
+    [SUB-]...-#tag1-#tag2-!hidden1-!hidden2"
+  [oid]
+  (let [tags    (re-seq #"#([^-]+)" oid)
+        hiddens (re-seq #"!([^-]+)" oid)]
+    {:sub     (str/starts-with? oid "SUB-")
+     :tags    (some->> (not-empty (mapv second tags))
+                (into-array String))
+     :hiddens (some->> (not-empty (mapv second hiddens))
+                (into-array String))}))
+
+
+(defn parse-tags [msg]
+  (let [tags (re-seq #"#([^ ]+)" msg)]
+    (some->> (not-empty (mapv second tags))
+      (into-array String))))
+
+
 ;;; Cleaning
 
 (def OWN-ACCOUNTS #{"UA223226690000026007300905964"})
@@ -163,7 +186,8 @@
                  :bank    (constantly "Oschad UAH")
                  :date    #(dt (date (get % 4)))
                  :amount  #(parse-n (get % 10))
-                 :comment #(make-comment (get % 13) (get % 19))}}
+                 :comment #(make-comment (get % 13) (get % 19))
+                 :tags    #(parse-tags (get % 19))}}
    :oschad-ext {:start    #(str/includes? % "№ п/п")
                 :skip     #(or (nil? (get % 1))
                                (some-> (get % 24) (str/starts-with? "Повернення коштів")))
@@ -179,7 +203,8 @@
                  :comment #(let [msg    (cleanup-ext (get % 24))
                                  amount (get % 12)]
                              (format "%s (%s %s)"
-                               msg (fmt-amount amount) *currency*))}}
+                               msg (fmt-amount amount) *currency*))
+                 :tags    #(parse-tags (get % 24))}}
    :privat     {:start #(str/includes? % "Дата проводки")
                 :skip  #(or (some-> (get % 7) (str/starts-with? "Повернення "))
                             (some-> (get % 7) (str/starts-with? "Кредиторська заборгованість"))
@@ -189,7 +214,8 @@
                  :bank    (constantly "Privat UAH")
                  :date    #(dt (str (get % 1) " " (get % 2)))
                  :amount  #(parse-n (get % 3))
-                 :comment #(make-comment (get % 7) (get % 5))}}
+                 :comment #(make-comment (get % 7) (get % 5))
+                 :tags    #(parse-tags (get % 5))}}
    :privat-ext {:start #(str/includes? % "Дата проводки")
                 ;; be careful, it has latin i
                 :skip  #(let [msg (get % 7)]
@@ -205,11 +231,12 @@
                                  amount   (get % 3)
                                  currency (get % 4)]
                              (format "%s (%s %s)"
-                               message (fmt-amount amount) currency))}}
+                               message (fmt-amount amount) currency))
+                 :tags    #(parse-tags (get % 7))}}
    :fondy      {:start #(str/includes? % "Внутрішній ID")
                 :skip  #(not= (get % 3) "approved")
                 :fields
-                {:id      #(get % 0)
+                {:id      #(get % 6)
                  :bank    #(if (str/starts-with? (get % 6) "SUB-")
                              "Fondy Sub"
                              "Fondy")
@@ -221,7 +248,8 @@
                                  country  (get % 13)
                                  _email   (get % 7)]
                              (format "%s ***%s (%s %s)"
-                               country card (fmt-amount amount) currency))}}
+                               country card (fmt-amount amount) currency))
+                 :tags    #(:tags (parse-card-oid (get % 6)))}}
    :cash       {:start #(str/includes? % "Тип надходження")
                 :skip  (constantly false)
                 :fields
@@ -229,7 +257,8 @@
                  :bank    (constantly "Cash")
                  :date    #(dt (get % 0))
                  :amount  #(parse-n (get % 1))
-                 :comment #(get % 2)}}})
+                 :comment #(get % 2)
+                 :tags    #(parse-tags (get % 2))}}})
 
 
 (defn detect-bank [data]
