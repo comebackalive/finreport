@@ -155,6 +155,7 @@
                                "Іщенко Максим Федорович"}
                               (get % 13))
                             (some-> (get % 19) (str/starts-with? "Повернення коштів"))
+                            (some-> (get % 19) (str/starts-with? "Кред.заб. за прийн.плат."))
                             ;; no date - no transaction
                             (= (get % 4) nil))
                 :fields
@@ -181,6 +182,7 @@
                                msg (fmt-amount amount) *currency*))}}
    :privat     {:start #(str/includes? % "Дата проводки")
                 :skip  #(or (some-> (get % 7) (str/starts-with? "Повернення "))
+                            (some-> (get % 7) (str/starts-with? "Кредиторська заборгованість"))
                             (contains? OWN-ACCOUNTS (get % 8)))
                 :fields
                 {:id      #(get % 0)
