@@ -86,38 +86,39 @@
 (def OWN-ACCOUNTS #{"UA223226690000026007300905964"})
 
 
-(def TRASH-SENDER
-  #{"АТ «ПУМБ»"
-    "ПАТ «БАНК ВОСТОК»"
-    "АТ \"Райффайзен Банк\""
-    "АТ \"АЛЬФА-БАНК\""
-    "Акціонерний банк \"Південний\""
-    "АТ \"Полтава-банк\""
-    "ПрАТ \"БАНК ФАМІЛЬНИЙ\""})
-
 (def TRASH-SENDER-RE
   #"(?x)
-    МВПС|
-    Транз.счет|
-    Транзит за розрах|
-    Транз.рах.|
-    ІНШІ ГОТІВКОВІ|
-    Ощадбанк|
-    ОЩАДБАНК|
-    ПРАВЕКС")
+    МВПС
+|Транз.счет
+|Транзит за розрах
+|Транз.рах.
+|ІНШІ ГОТІВКОВІ
+|Ощадбанк
+|ОЩАДБАНК
+|ПРАВЕКС
+|ПУМБ
+|АКОРДБАНК
+|NEOBANK
+|\bБанк\b
+|\bБАНК\b
+|\bбанк\b")
 
 
 (defn maybe-drop-sender [s]
   (when-not (or (not s)
-                (contains? TRASH-SENDER s)
                 (re-find TRASH-SENDER-RE s))
     s))
 
 
+(defn short-name [s]
+  (let [i (str/index-of s " ")]
+    (format "%s %s."
+      (str/capitalize (subs s 0 i))
+      (str/capitalize (subs s (+ i 1) (+ i 2))))))
+
+
 (defn capitalize-every [s]
-  (->> (str/split s #"\s+")
-       (map str/capitalize)
-       (str/join " ")))
+  (str/replace s #"\b[^ ]+\b" (fn [m] (str/capitalize m))))
 
 
 (defn cleanup-ext [s]
@@ -136,6 +137,10 @@
   (cleanup-ext "From SOME ONE SZEWCZENKI 12/3 79666 LWOW UA UA for Przelew"))
 
 
+(def NAME-RE
+  #"(?u)(\p{Lu}[\p{Lu}\p{Ll}\-]+ \p{Lu}[\p{Lu}\p{Ll}\-]+)( \p{Lu}[\p{Lu}\p{Ll}\-]+)")
+
+
 (defn cleanup [s]
   (reduce (fn [s [re sub]]
             (str/replace s re sub))
@@ -145,19 +150,37 @@
      [#"(?ui)Призначення платежу: ", ""]
      ;; with latin letters
      [#"(?ui)(ІПН|IПН|ІПH|IПH|ИНН) ?\d+", ""]
+     [#"(?ui)квитанцiя [\d\.\-]+" ""]
      [#"(?ui)Рахунок платника [\d\w]+", ""]
-     [#"(?ui)платник", ""]
+     ;; oschad sometimes strips data in the end
+     [#"(?ui)Рахунок платника$", ""]
+     [#"(?ui)Рахунок$", ""]
+     [#"(?ui)квитанцiя$" ""]
+     [#"(?ui)кв.? ?\d+" ""]
+     ;; removing names
+     ;; when there is a name: uppercase, followed by non-uppercases and a space, two or three times
+     [NAME-RE (fn [m]
+                (capitalize-every (second m)))]
      [#"[A-Z]{2}\d{27}", ""]
-     [#"\d{7,}", ""] ; phones, ids, etc
+     [#"\d{7,}", ""]                    ; phones, ids, etc
      [#"\n", " "]
      [#"  +", " "]
-     ;; це коли ім'я два рази повторюється
-     [#"(?ui)([^ ]+( [^ ]+)?( [^ ]+)?), \\1", "\\1"]]))
+     ;; leftover punctuation
+     [#"\s+$" ""]
+     [#". \)" ".)"]
+     [#". ," ".,"]
+     [#"[\(\)\-\.\,\s\d]{4,}" ""]
+     [#",$" ""]]))
 
 
 (defn make-comment [sender message]
-  (let [sender  (maybe-drop-sender sender)
-        message (str/trim (cleanup message))]
+  (let [message (cond-> (cleanup message)
+                  (not (str/blank? sender)) (str/replace sender "")
+                  true                      (str/trim))
+        sender  (if (re-matches NAME-RE sender)
+                  (str/replace sender NAME-RE
+                    (fn [m] (capitalize-every (second m))))
+                  (maybe-drop-sender sender))]
     (if sender
       (str sender " -- " message)
       message)))
@@ -239,8 +262,8 @@
                 :fields
                 {:id      #(get % 6)
                  :bank    #(if (str/starts-with? (get % 6) "SUB-")
-                             "Fondy Sub"
-                             "Fondy")
+                             "Subscription"
+                             "Card")
                  :date    #(dt (get % 1))
                  :amount  #(parse-n (get % 10))
                  :comment #(let [amount   (get % 4)

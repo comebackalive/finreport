@@ -79,8 +79,8 @@
   (let [data (process/parse-card-oid (:order_id src))]
     {:id      (:order_id src)
      :bank    (if (:sub data)
-                "Fondy Sub"
-                "Fondy")
+                "Subscription"
+                "Card")
      :date    (process/dt (:order_timestart src))
      :amount  (or (process/parse-n (:settlement_amount src))
                   ;; embed commission, newer tx dont have settlement_amount yet

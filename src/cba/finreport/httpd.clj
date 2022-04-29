@@ -75,7 +75,7 @@
 (defn track-process [f cb]
   (let [start  (System/currentTimeMillis)
         res    (process/process-and-store :db (:filename f) (:tempfile f))
-        cb-res (cb (:filename f) (:tempfile f))
+        cb-res (when cb (cb (:filename f) (:tempfile f)))
         total  (- (System/currentTimeMillis) start)]
     (hi/html
       [:div
@@ -101,13 +101,14 @@
   (try
     (let [f    (get-in req [:multipart-params "file"])
           info (track-process f
-                 (fn [fname file]
-                   (let [ba (-> file io/input-stream .readAllBytes)]
-                     (-> (s3 :PutObject {:Bucket ARCHIVE
-                                         :Key    (process/file-name fname)
-                                         :Body   ba})
-                         :ETag
-                         boolean))))]
+                 (when-not (config/DEV)
+                   (fn [fname file]
+                     (let [ba (-> file io/input-stream .readAllBytes)]
+                       (-> (s3 :PutObject {:Bucket ARCHIVE
+                                           :Key    (process/file-name fname)
+                                           :Body   ba})
+                           :ETag
+                           boolean)))))]
       {:status  200
        :headers {"Content-Type" "text/html"}
        :body    (str info)})
