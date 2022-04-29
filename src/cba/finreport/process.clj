@@ -141,37 +141,43 @@
   #"(?u)(\p{Lu}[\p{Lu}\p{Ll}\-]+ \p{Lu}[\p{Lu}\p{Ll}\-]+)( \p{Lu}[\p{Lu}\p{Ll}\-]+)")
 
 
+(def CLEANUP-RES
+  [[#"(?ui)(, )?без пдв\.?", ""]
+   [#"(?ui)(у т.ч. )?ПДВ \d+% - [\d\,]+ грн.", ""]
+   [#"(?ui)Призначення платежу: ", ""]
+   ;; with latin letters
+   [#"(?ui)(ІПН|IПН|ІПH|IПH|ИНН) ?\d+", ""]
+   [#"(?ui)квитанцiя [\d\.\-]+" ""]
+   [#"(?ui)Рахунок платника [\d\w]+", ""]
+   ;; oschad sometimes strips data in the end
+   [#"(?ui)Рахунок платника$", ""]
+   [#"(?ui)Рахунок$", ""]
+   [#"(?ui)квитанцiя$" ""]
+   [#"(?ui)\b(вул|бул|ул|пров|пр)\..*$" ""]
+   [#"(?ui)кв.? ?\d+" ""]
+   [#"(?ui)\bм\..*$" ""]
+   ;; removing names
+   ;; when there is a name: uppercase, followed by non-uppercases and a space, two or three times
+   [NAME-RE (fn [m]
+              (capitalize-every (second m)))]
+   [#"(?u)([\p{L}\-]+ [\p{L}\-]+), \1" "$1"]
+   [#"[A-Z]{2}\d{27}", ""]
+   [#"\d{7,}", ""]                      ; phones, ids, etc
+   [#"\n", " "]
+   [#"  +", " "]
+   ;; leftover punctuation
+   [#"\s+$" ""]
+   [#". \)" ".)"]
+   [#". ," ".,"]
+   [#"[\(\)\-\.\,\s\d]{4,}" ""]
+   [#",$" ""]])
+
+
 (defn cleanup [s]
   (reduce (fn [s [re sub]]
             (str/replace s re sub))
     s
-    [[#"(?ui)(, )?без пдв\.?", ""]
-     [#"(?ui)(у т.ч. )?ПДВ \d+% - [\d\,]+ грн.", ""]
-     [#"(?ui)Призначення платежу: ", ""]
-     ;; with latin letters
-     [#"(?ui)(ІПН|IПН|ІПH|IПH|ИНН) ?\d+", ""]
-     [#"(?ui)квитанцiя [\d\.\-]+" ""]
-     [#"(?ui)Рахунок платника [\d\w]+", ""]
-     ;; oschad sometimes strips data in the end
-     [#"(?ui)Рахунок платника$", ""]
-     [#"(?ui)Рахунок$", ""]
-     [#"(?ui)квитанцiя$" ""]
-     [#"(?ui)кв.? ?\d+" ""]
-     ;; removing names
-     ;; when there is a name: uppercase, followed by non-uppercases and a space, two or three times
-     [NAME-RE (fn [m]
-                (capitalize-every (second m)))]
-     [#"(?u)([\p{L}\-]+ [\p{L}\-]+), \1" "$1"]
-     [#"[A-Z]{2}\d{27}", ""]
-     [#"\d{7,}", ""]                    ; phones, ids, etc
-     [#"\n", " "]
-     [#"  +", " "]
-     ;; leftover punctuation
-     [#"\s+$" ""]
-     [#". \)" ".)"]
-     [#". ," ".,"]
-     [#"[\(\)\-\.\,\s\d]{4,}" ""]
-     [#",$" ""]]))
+    CLEANUP-RES))
 
 
 (defn make-comment [sender message]
