@@ -263,8 +263,8 @@
                 :fields
                 {:id      #(get % 6)
                  :bank    #(if (str/starts-with? (get % 6) "SUB-")
-                             "Subscription"
-                             "Card")
+                             "Fondy Sub"
+                             "Fondy")
                  :date    #(dt (get % 1))
                  :amount  #(parse-n (get % 10))
                  :comment #(let [amount   (get % 4)
@@ -312,15 +312,19 @@
       "cp1251"
       "utf-8")))
 
+
 (defn read-csv [f]
-  (let [enc  (guess-file-enc f)
-        line (with-open [r (io/reader f :encoding enc)]
-               (.readLine ^java.io.BufferedReader r))
-        sep  (if (< (count (re-seq #"," line))
-                    (count (re-seq #";" line)))
-               \;
-               \,)]
-    (csv/read-csv (io/reader f :encoding enc) :separator sep)))
+  (let [enc (guess-file-enc f)]
+    (with-open [rdr (io/reader f :encoding enc)]
+      (.mark rdr 100)
+      (let [line (.readLine ^java.io.BufferedReader rdr)
+            sep  (if (< (count (re-seq #"," line))
+                        (count (re-seq #";" line)))
+                  \;
+                  \,)]
+        (.reset rdr)
+        (into []
+          (csv/read-csv rdr :separator sep))))))
 
 
 (defn read-xls-cell [^Cell cell]
