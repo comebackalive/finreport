@@ -161,6 +161,7 @@
      ;; when there is a name: uppercase, followed by non-uppercases and a space, two or three times
      [NAME-RE (fn [m]
                 (capitalize-every (second m)))]
+     [#"(?u)([\p{L}\-]+ [\p{L}\-]+), \1" "$1"]
      [#"[A-Z]{2}\d{27}", ""]
      [#"\d{7,}", ""]                    ; phones, ids, etc
      [#"\n", " "]

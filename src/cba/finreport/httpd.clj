@@ -168,6 +168,20 @@
      :body    "Please supply file name"}))
 
 
+(defn reprocess-all [& [check]]
+  (let [check (or check identity)
+        fs    (->> (:Contents
+                    (s3 :ListObjectsV2 {:Bucket ARCHIVE}))
+                   (mapv :Key))]
+    (println "In total" (count fs))
+    (doseq [[i f] (map-indexed vector fs)
+            :let [body (:Body (s3 :GetObject {:Bucket ARCHIVE :Key f}))]]
+      (if (check f)
+        (println i f (-> (process/process-and-store :db f body)
+                         (update :skipped count)))
+        (println "skipped" f)))))
+
+
 ;;; Routing/app
 
 (defn mk-handler [req func & names]
