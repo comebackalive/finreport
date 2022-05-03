@@ -14,16 +14,20 @@
 (def ^MessageDigest sha512md (MessageDigest/getInstance "SHA-512"))
 
 
+(defn ^bytes bytes [^String s]
+  (.getBytes s "UTF-8"))
+
+
 (defn hex [^bytes v]
   (Hex/encodeHexString v))
 
 
 (defn sha1 [^String v]
-  (hex (.digest sha1md (.getBytes v "UTF-8"))))
+  (hex (.digest sha1md (bytes v))))
 
 
 (defn sha512 [^String v]
-  (hex (.digest sha512md (.getBytes v "UTF-8"))))
+  (hex (.digest sha512md (bytes v))))
 
 
 (defn exc-mw [handler]

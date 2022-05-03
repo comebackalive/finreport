@@ -22,18 +22,19 @@
 (def fondy2-dt-fmt (DateTimeFormatter/ofPattern "yyyy-MM-dd HH:mm:ss"))
 (def date-fmt (DateTimeFormatter/ofPattern "dd.MM.yyyy"))
 
-(defn dt [s]
-  (cond
-    (string? s)             (loop [fmts [dt-fmt
-                                         fondy2-dt-fmt
-                                         fondy-dt-fmt]]
-                              (when (seq fmts)
-                                (or (try
-                                      (LocalDateTime/parse s (first fmts))
-                                      (catch DateTimeParseException _))
-                                    (recur (rest fmts)))))
-    (instance? LocalDate s) (.atStartOfDay ^LocalDate s)
-    :else                   s))
+(defn dt
+  ([fmt s]
+   (LocalDateTime/parse s fmt))
+  ([s]
+   (cond
+     (string? s)             (loop [fmts [dt-fmt fondy2-dt-fmt fondy-dt-fmt]]
+                               (when (seq fmts)
+                                 (or (try
+                                       (LocalDateTime/parse s (first fmts))
+                                       (catch DateTimeParseException _))
+                                     (recur (rest fmts)))))
+     (instance? LocalDate s) (.atStartOfDay ^LocalDate s)
+     :else                   s)))
 
 (defn date [s]
   (cond
@@ -64,10 +65,10 @@
 
   Order id should be of format:
 
-    [SUB-]...-#tag1-#tag2-!hidden1-!hidden2"
+    [SUB-]...~#tag1~#tag2~_hidden1~_hidden2"
   [oid]
-  (let [tags    (re-seq #"#([^-]+)" oid)
-        hiddens (re-seq #"!([^-]+)" oid)]
+  (let [tags    (re-seq #"#([^~]+)" oid)
+        hiddens (re-seq #"_([^~]+)" oid)]
     {:sub     (str/starts-with? oid "SUB-")
      :tags    (some->> (not-empty (mapv second tags))
                 (into-array String))
@@ -326,8 +327,8 @@
       (let [line (.readLine ^java.io.BufferedReader rdr)
             sep  (if (< (count (re-seq #"," line))
                         (count (re-seq #";" line)))
-                  \;
-                  \,)]
+                   \;
+                   \,)]
         (.reset rdr)
         (into []
           (csv/read-csv rdr :separator sep))))))
@@ -501,7 +502,7 @@
   (let [{opts true
          args false} (group-by #(str/starts-with? % "-") args)
         opts         (into #{} opts)
-        mode     (if (contains? opts "--csv") :csv :db)]
+        mode         (if (contains? opts "--csv") :csv :db)]
     (doseq [path args]
       (process-and-store mode path nil))))
 
