@@ -304,8 +304,8 @@
       (= (g 0 0) "Назва Клієнта")                     :oschad
       (= (g 1 6) "Сума еквівалент у гривні")          :privat-ext
       (str/starts-with? (g 0 0) "Виписка по рахунку") :privat
-      (and (= (g 0 2) "Тип надходження")
-           (= (g 1 2) "готівка"))                     :cash
+      (and (= (g 0 3) "Тип надходження")
+           (= (g 1 3) "готівка"))                     :cash
       :else
       (throw (ex-info "Unknown bank!" {:rows rows})))))
 
@@ -343,7 +343,7 @@
                        (.getNumericCellValue cell))
     CellType/STRING  (.getStringCellValue cell)
     CellType/BLANK   nil
-    CellType/FORMULA nil
+    CellType/FORMULA (.getNumericCellValue cell)
     (throw (ex-info "Unknown cell type" {:type (.getCellType cell)}))))
 
 
