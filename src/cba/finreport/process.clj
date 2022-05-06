@@ -241,7 +241,6 @@
                  :tags    #(parse-tags (get % 24))}}
    :privat     {:start #(str/includes? % "Дата проводки")
                 :skip  #(or (some-> (get % 7) (str/starts-with? "Повернення "))
-                            (some-> (get % 7) (str/starts-with? "Кредиторська заборгованість"))
                             (contains? OWN-ACCOUNTS (get % 8)))
                 :fields
                 {:id      #(get % 0)
