@@ -77,7 +77,8 @@
 
 
 (defn parse-tags [msg]
-  (let [tags (re-seq #"#([^ ]+)" msg)]
+  ;; tag starts with a letter, ends with a letter or number
+  (let [tags (re-seq #"#(\w[\w\d_\-\.]*[\d\w])" msg)]
     (some->> (not-empty (mapv second tags))
       (into-array String))))
 
