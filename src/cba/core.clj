@@ -1,4 +1,5 @@
 (ns cba.core
+  (:refer-clojure :exclude [bytes])
   (:import [java.security MessageDigest]
            [org.apache.commons.codec.binary Hex])
   (:require [clojure.stacktrace :as st]

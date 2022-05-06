@@ -128,7 +128,6 @@
   (let [path (-> req :path-params :path codec/url-decode)
         obj  (s3 :GetObject {:Bucket ARCHIVE
                              :Key    path})]
-    (prn obj)
     (if (:Error obj)
       {:status  404
        :headers {"Content-Type" "text/plain"}
