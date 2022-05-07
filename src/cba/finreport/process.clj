@@ -220,7 +220,7 @@
                             ;; no date - no transaction
                             (= (get % 4) nil))
                 :fields
-                {:id      #(get % 0)
+                {:id      #(get % 2)
                  :bank    (constantly "Oschad UAH")
                  :date    #(dt (date (get % 4)))
                  :amount  #(parse-n (get % 10))
