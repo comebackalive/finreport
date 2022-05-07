@@ -60,6 +60,9 @@
         (throw (Exception. (str "cannot parse number " s)))))))
 
 
+(def TAG-RE #"(?u)#(\p{L}[\p{L}\d_\-\.]*[\p{L}\d])")
+
+
 (defn parse-card-oid
   "Parses order id from card system to get various props.
 
@@ -67,7 +70,7 @@
 
     [SUB-]...~#tag1~#tag2~_hidden1~_hidden2"
   [oid]
-  (let [tags    (re-seq #"#([^~]+)" oid)
+  (let [tags    (re-seq TAG-RE oid)
         hiddens (re-seq #"_([^~]+)" oid)]
     {:sub     (str/starts-with? oid "SUB-")
      :tags    (some->> (not-empty (mapv second tags))
@@ -76,12 +79,13 @@
                 (into-array String))}))
 
 
+
+
 (defn parse-tags [msg]
   ;; tag starts with a letter, ends with a letter or number
-  (let [tags (re-seq #"#(\w[\w\d_\-\.]*[\d\w])" msg)]
+  (let [tags (re-seq TAG-RE msg)]
     (some->> (not-empty (mapv second tags))
       (into-array String))))
-
 
 ;;; Cleaning
 
