@@ -2,7 +2,8 @@
   (:require [clojure.tools.logging :as log]
 
             [cba.finreport.fondy :as fondy]
-            [mount.core :as mount]))
+            [mount.core :as mount]
+            [cba.finreport.solidgate :as solidgate]))
 
 
 (defn run-schedule []
@@ -18,6 +19,7 @@
                      (log/debugf "schedule %s" id)
                      (try
                        (fondy/cron)
+                       (solidgate/cron)
                        (catch Exception e
                          (log/error e "cron error")))
                      (try

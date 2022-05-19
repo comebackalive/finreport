@@ -1,5 +1,5 @@
 (ns cba.finreport.solidgate
-  (:import [java.time LocalDate]
+  (:import [java.time LocalDateTime]
            [java.time.format DateTimeFormatter]
            [javax.crypto Mac]
            [javax.crypto.spec SecretKeySpec])
@@ -47,7 +47,6 @@
                  :timeout (config/TIMEOUT)})
         data (-> res :body (json/parse-string true))]
     (log/debugf "req %s %s %s" (:status res) url ctx)
-    (prn res)
     (if (:error data)
       (throw (ex-info (-> data :error :messages first) {:data data}))
       (with-meta data {:response res}))))
@@ -62,16 +61,11 @@
                    :next_page_iterator cursor}))
               {:initk nil
                :kf    (fn [res] (-> res :metadata :next_page_iterator))
-               :vf    (fn [res] (:orders res))})]
-    (into [] cat res)))
-
-
-(defn currency->uah [amount currency]
-  (case currency
-    "UAH" amount
-    "USD" (* amount 29.25)
-    "EUR" (* amount 30.76)
-    "PLN" (* amount 6.56)))
+               :vf    (fn [res] (:orders res))})
+        xf (comp
+             cat
+             (filter #(= "approved" (:status %))))]
+    (into [] xf res)))
 
 
 (defn parse-source [src]
@@ -93,24 +87,27 @@
                 "Subscription"
                 "Card")
      :date    (process/dt dt-fmt (:created_at order))
-     :amount  (currency->uah (:currency order) (:amount order))
+     :amount  (if (= (:processing_currency order) "UAH")
+                (/ (:processing_amount order) 100.0)
+                (throw (ex-info "Can't process tx currency"
+                         {:processing_currency (:processing_currency order)})))
      :comment (format "%s ***%s (%s %s)"
                 (-> tx :card :country)
                 (last (str/split (-> tx :card :number) #"XXX"))
-                (:amount order)
+                (process/fmt-amount (/ (:amount order) 100.0))
                 (:currency order))
      :tags    (:tags data)
      :hiddens (:hiddens data)}))
 
 
 (defn cron []
-  (let [d   (LocalDate/now)
-        res (get-report {:from (str (.minusDays d 1))
-                         :to   (str d)})]
-    (process/write-db "fondy api" (map report->row res))))
+  (let [d   (LocalDateTime/now)
+        res (get-report {:from (.format (.minusDays d 1) dt-fmt)
+                         :to   (.format d dt-fmt)})]
+    (process/write-db "solidgate api" (map report->row res))))
 
 
 (comment
   (req! "/reconciliation/orders"
-    {:date_from "2022-05-03 00:00:00"
-     :date_to   "2022-05-03 23:59:59"}))
+    {:date_from "2022-05-18 00:00:00"
+     :date_to   "2022-05-19 23:59:59"}))

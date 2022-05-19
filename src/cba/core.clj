@@ -15,7 +15,7 @@
 (def ^MessageDigest sha512md (MessageDigest/getInstance "SHA-512"))
 
 
-(defn ^bytes bytes [^String s]
+(defn bytes ^bytes [^String s]
   (.getBytes s "UTF-8"))
 
 
