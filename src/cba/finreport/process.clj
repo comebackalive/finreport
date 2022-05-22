@@ -216,7 +216,6 @@
                               (get % 13))
                             ;; "коштів" буває з латинською "i"
                             (some-> (get % 19) (str/starts-with? "Повернення кошт"))
-                            (some-> (get % 13) (str/starts-with? "Кред.заб."))
                             ;; no date - no transaction
                             (= (get % 4) nil))
                 :fields
