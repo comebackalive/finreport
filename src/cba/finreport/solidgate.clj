@@ -84,8 +84,8 @@
         data (some-> (:traffic_source order) parse-source)]
     {:id      (:order_id order)
      :bank    (if (= (:type order) "recurring")
-                "SolidGate Sub"
-                "SolidGate Card")
+                "Solidgate Sub"
+                "Solidgate Card")
      :date    (process/dt dt-fmt (:created_at order))
      :amount  (if (= (:processing_currency order) "UAH")
                 (/ (:processing_amount order) 100.0)
