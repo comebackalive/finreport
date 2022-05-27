@@ -80,17 +80,19 @@
 
 
 (defn report->row [order]
-  (let [tx   (-> order :transactions first)
-        data (some-> (:traffic_source order) parse-source)]
+  (let [tx       (-> order :transactions first)
+        data     (some-> (:traffic_source order) parse-source)
+        currency (:processing_currency order)]
     {:id      (:order_id order)
      :bank    (if (= (:type order) "recurring")
                 "Solidgate Sub"
                 "Solidgate Card")
      :date    (process/dt dt-fmt (:created_at order))
-     :amount  (if (= (:processing_currency order) "UAH")
-                (/ (:processing_amount order) 100.0)
-                (throw (ex-info "Can't process tx currency"
-                         {:processing_currency (:processing_currency order)})))
+     :amount  (case currency
+                "UAH" (/ (:processing_amount order) 100.0)
+                "USD" (* (:processing_amount order) 0.2925)
+                (throw (ex-info (str "Can't process tx currency " currency)
+                         {:processing_currency currency})))
      :comment (format "%s ***%s (%s %s)"
                 (-> tx :card :country)
                 (last (str/split (-> tx :card :number) #"XXX"))
@@ -108,6 +110,5 @@
 
 
 (comment
-  (req! "/reconciliation/orders"
-    {:date_from "2022-05-18 00:00:00"
-     :date_to   "2022-05-19 23:59:59"}))
+  (get-report {:from "2022-05-27 06:00:00"
+               :to   "2022-05-27 23:59:59"}))
