@@ -23,7 +23,7 @@
                        (catch Exception e
                          (log/error e "cron error")))
                      (try
-                       (Thread/sleep (* 5 60 1000))
+                       (Thread/sleep (* 60 1000))
                        (catch InterruptedException _
                          (log/infof "schedule %s: sleep interrupt" id)))
                      (recur)))))]

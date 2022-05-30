@@ -1,5 +1,5 @@
 (ns cba.finreport.solidgate
-  (:import [java.time LocalDateTime]
+  (:import [java.time LocalDate]
            [java.time.format DateTimeFormatter]
            [javax.crypto Mac]
            [javax.crypto.spec SecretKeySpec])
@@ -15,7 +15,7 @@
 
 
 (set! *warn-on-reflection* true)
-(def BASE "https://reports.solidgate.com/api/v2")
+(def BASE "https://reports.solidgate.com/api")
 (def dt-fmt (DateTimeFormatter/ofPattern "yyyy-MM-dd HH:mm:ss"))
 
 
@@ -52,10 +52,12 @@
       (with-meta data {:response res}))))
 
 
-(defn get-report [{:keys [from to]}]
+(defn get-report
+  "Solidgate docs: https://dev.solidgate.com/developers/documentation/reports/"
+  [{:keys [from to]}]
   (let [res (iteration
               (fn [cursor]
-                (req! "/reconciliation/orders"
+                (req! "/v1/card-orders"
                   {:date_from          from
                    :date_to            to
                    :next_page_iterator cursor}))
@@ -81,7 +83,9 @@
 
 (defn report->row [order]
   (let [tx       (-> order :transactions first)
-        data     (some-> (:traffic_source order) parse-source)
+        data     (merge-with into
+                   (some-> (:order_id order) parse-source)
+                   (some-> (:traffic_source order) parse-source))
         currency (:processing_currency order)]
     {:id      (:order_id order)
      :bank    (if (= (:type order) "recurring")
@@ -91,6 +95,7 @@
      :amount  (case currency
                 "UAH" (/ (:processing_amount order) 100.0)
                 "USD" (* (:processing_amount order) 0.2925)
+                "EUR" (* (:processing_amount order) 0.3161)
                 (throw (ex-info (str "Can't process tx currency " currency)
                          {:processing_currency currency})))
      :comment (format "%s ***%s (%s %s)"
@@ -102,13 +107,18 @@
      :hiddens (:hiddens data)}))
 
 
-(defn cron []
-  (let [d   (LocalDateTime/now)
-        res (get-report {:from (.format (.minusDays d 1) dt-fmt)
-                         :to   (.format d dt-fmt)})]
+(defn store! [from to]
+  (let [res (get-report {:from from :to to})]
     (process/write-db "solidgate api" (map report->row res))))
 
 
+(defn cron []
+  (let [d (LocalDate/now)]
+    (store!
+      (str (.minusDays d 1) " 00:00:00")
+      (str (.plusDays d 1) " 00:00:00"))))
+
+
 (comment
-  (get-report {:from "2022-05-27 06:00:00"
-               :to   "2022-05-27 23:59:59"}))
+  (time (get-report {:from "2022-05-29 00:00:00"
+                     :to   "2022-05-31 00:00:00"})))
