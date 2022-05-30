@@ -70,22 +70,9 @@
     (into [] xf res)))
 
 
-(defn parse-source [src]
-  (reduce
-    (fn [acc v]
-      (if (str/starts-with? v "_")
-        (update acc :hiddens conj (subs v 1))
-        (update acc :tags conj v)))
-    {:tags    []
-     :hiddens []}
-    (str/split src #"~")))
-
-
 (defn report->row [order]
   (let [tx       (-> order :transactions first)
-        data     (merge-with into
-                   (some-> (:order_id order) parse-source)
-                   (some-> (:traffic_source order) parse-source))
+        data     (process/parse-card-oid (:order_id order))
         currency (:processing_currency order)]
     {:id      (:order_id order)
      :bank    (if (= (:type order) "recurring")
