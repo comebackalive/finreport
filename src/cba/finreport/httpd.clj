@@ -72,10 +72,10 @@
 
 
 
-(defn track-process [f cb]
+(defn track-process [f & [cb]]
   (let [start  (System/currentTimeMillis)
         res    (process/process-and-store :db (:filename f) (:tempfile f))
-        cb-res (when cb (cb (:filename f) (:tempfile f)))
+        cb-res (when cb (cb (:filename f) (:tempfile f) res))
         total  (- (System/currentTimeMillis) start)]
     (hi/html
       [:div
@@ -97,18 +97,21 @@
                   [:td cell])])]]])))
 
 
+(defn s3-archive [fname file res]
+  (let [ba   (-> file io/input-stream .readAllBytes)
+        path (str (name (:bank res)) "/" (process/file-name fname))]
+    (-> (s3 :PutObject {:Bucket ARCHIVE
+                        :Key    path
+                        :Body   ba})
+        :ETag
+        boolean)))
+
+
 (defn upload [req]
   (try
     (let [f    (get-in req [:multipart-params "file"])
           info (track-process f
-                 (when-not (config/DEV)
-                   (fn [fname file]
-                     (let [ba (-> file io/input-stream .readAllBytes)]
-                       (-> (s3 :PutObject {:Bucket ARCHIVE
-                                           :Key    (process/file-name fname)
-                                           :Body   ba})
-                           :ETag
-                           boolean)))))]
+                 (when-not (config/DEV) s3-archive))]
       {:status  200
        :headers {"Content-Type" "text/html"}
        :body    (str info)})
@@ -153,8 +156,7 @@
                                                      :Key    fname})]]
                      (track-process {:filename fname
                                      :tempfile (:Body data)
-                                     :size     (:ContentLength data)}
-                       (constantly false))))]
+                                     :size     (:ContentLength data)})))]
       {:status  200
        :headers {"Content-Type" "text/html"}
        :body    (str
