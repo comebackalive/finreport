@@ -79,8 +79,6 @@
                 (into-array String))}))
 
 
-
-
 (defn parse-tags [msg]
   ;; tag starts with a letter, ends with a letter or number
   (let [tags (re-seq TAG-RE msg)]
