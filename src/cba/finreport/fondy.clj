@@ -1,11 +1,12 @@
 (ns cba.finreport.fondy
   (:import [java.time Instant LocalDate])
-  (:require [cba.config :as config]
-            [clojure.string :as str]
-            [cba.core :as core]
+  (:require [clojure.string :as str]
+            [clojure.tools.logging :as log]
             [org.httpkit.client :as http]
             [cheshire.core :as json]
-            [clojure.tools.logging :as log]
+
+            [cba.config :as config]
+            [cba.core :as core]
             [cba.finreport.process :as process]))
 
 

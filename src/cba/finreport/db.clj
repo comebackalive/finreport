@@ -73,6 +73,11 @@
   ([conn query] (first (q conn query))))
 
 
+(defn string-array [v]
+  (if (not-empty v)
+    (into-array String v)
+    nil))
+
 ;;; Extensions
 
 (extend-protocol jdbc-rs/ReadableColumn

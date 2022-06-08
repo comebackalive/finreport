@@ -73,10 +73,8 @@
   (let [tags    (re-seq TAG-RE oid)
         hiddens (re-seq #"_([^~]+)" oid)]
     {:sub     (str/starts-with? oid "SUB-")
-     :tags    (some->> (not-empty (mapv second tags))
-                (into-array String))
-     :hiddens (some->> (not-empty (mapv second hiddens))
-                (into-array String))}))
+     :tags    (not-empty (mapv second tags))
+     :hiddens (not-empty (mapv second hiddens))}))
 
 
 (defn parse-tags [msg]
@@ -479,7 +477,8 @@
           fields   [:fname :bank :date :amount :comment :tags :hiddens]
           mkrow    (fn [row]
                      [fname (:bank row) (:date row) (:amount row) (:comment row)
-                      (:tags row) (:hiddens row)])
+                      (db/string-array (:tags row))
+                      (db/string-array (:hiddens row))])
           insres   (for [batch (partition-all 1000 rows)]
                      (->> batch
                           (map mkrow)
