@@ -294,20 +294,33 @@
                  :date    #(dt (get % 0))
                  :amount  #(parse-n (get % 1))
                  :comment #(get % 2)
-                 :tags    #(parse-tags (get % 2))}}})
+                 :tags    #(parse-tags (get % 2))}}
+
+   :spending {:start #(str/includes? % "Дата")
+              :skip  (constantly false)
+              :fields
+              {:id     (constantly "")
+               :bank   (constantly "Spending")
+               :date   #(dt (date (get % 6)))
+               :amount #(parse-n (get % 8))
+               :name   #(get % 7)
+               :target #(get % 11)}}})
 
 
 (defn detect-bank [data]
   (let [rows (into [] (take 15 data))
         g    (fn [x y] (some-> (get-in rows [x y]) str str/trim))]
     (cond
-      (= (g 0 0) "Внутрішній ID")                     :fondy
-      (= (g 10 14) "КТ рахунку (еквівалент)")         :oschad-ext
-      (= (g 0 0) "Назва Клієнта")                     :oschad
-      (= (g 1 6) "Сума еквівалент у гривні")          :privat-ext
-      (str/starts-with? (g 0 0) "Виписка по рахунку") :privat
+      (= (g 0 0) "Внутрішній ID")                        :fondy
+      (= (g 10 14) "КТ рахунку (еквівалент)")            :oschad-ext
+      (= (g 0 0) "Назва Клієнта")                        :oschad
+      (= (g 1 6) "Сума еквівалент у гривні")             :privat-ext
+      (some-> (g 0 0)
+        (str/starts-with? "Виписка по рахунку"))         :privat
       (and (= (g 0 3) "Тип надходження")
-           (= (g 1 3) "готівка"))                     :cash
+           (= (g 1 3) "готівка"))                        :cash
+      (some->
+        (g 1 0) (str/starts-with? "ВИТРАТИ НА ПРОЕКТИ")) :spending
       :else
       (throw (ex-info "Unknown bank!" {:rows rows})))))
 
@@ -350,17 +363,21 @@
 
 
 (defn read-xls [path]
-  (let [s     (io/input-stream path)
-        wb    (WorkbookFactory/create s)
-        sheet (.getSheetAt wb 0)]
-    (for [row sheet]
+  (let [s  (io/input-stream path)
+        wb (WorkbookFactory/create s)]
+    (for [sheet (iterator-seq (.sheetIterator wb))
+          row   sheet]
       (mapv read-xls-cell row))))
 
 
 (comment
   (def x (read-xls "БФ_Приват_злотий_29_03_2022.xls"))
   (def x (read-xls "/Users/piranha/dev/misc/pzh-finance/clj-finreport/Ощад_28_02_2022.xlsx"))
-  (def x (read-xls "/Users/piranha/dev/misc/pzh-finance/clj-finreport/49949__1622114.xlsx"))
+  (def x (read-xls "/Users/piranha/Downloads/Витрати_2021_О-З_розбивка_по_проектах_для звіту.xlsx"))
+  (def w (drop-while #(not ((-> CONFIG :spending :start) %)) x))
+  (def q (first (drop 6 w)))
+
+  (parse-row (-> CONFIG :spending :fields) "UAH" 1 q)
 
   (->> x (drop 5) first))
 
@@ -387,9 +404,6 @@
     (nil? v)))
 
 
-(defn reporting-remove [])
-
-
 (defn process [path content]
   (log/info "Working on" path)
   (let [content (or content (io/file path))
@@ -409,7 +423,7 @@
         *skipped              (atom [])
 
         func (fn [i row]
-               (let [skip? (or (nothing? (first row))
+               (let [skip? (or (every? nothing? (take 3 row))
                                (< (count row) 3)
                                (skip-fn row))
                      res   (when-not skip?
@@ -463,26 +477,42 @@
 
 
 (def DELETE-Q
-  "delete from report
+  "delete from %s
     where bank = ?
       and date >= ?::date
       and date < (?::date + '1 day'::interval)")
 
 
+(def FIELDS
+  {:donate   [:fname :bank :date :amount :comment :tags :hiddens]
+   :spending [:fname :bank :date :amount :name :target]})
+
+
 (defn write-db [path rows]
   (jdbc/with-transaction [tx db/conn]
-    (let [fname    (file-name path)
+    (let [fname     (file-name path)
+          spending? (= "Spending" (:bank (first rows)))
+          table     (if spending? :spending :report)
+          fields    (if spending?
+                      (:spending FIELDS)
+                      (:donate FIELDS))
+          mkrow     (if spending?
+                      (fn [row]
+                        [fname (:bank row) (:date row) (:amount row)
+                         (:name row) (:target row)])
+                      (fn [row]
+                        [fname (:bank row) (:date row) (:amount row)
+                         (:comment row)
+                         (db/string-array (:tags row))
+                         (db/string-array (:hiddens row))]))
+
+          delete-q (format DELETE-Q (name table))
           delres   (for [[bank d] (bank-days rows)]
-                     (db/one tx [DELETE-Q bank d d]))
-          fields   [:fname :bank :date :amount :comment :tags :hiddens]
-          mkrow    (fn [row]
-                     [fname (:bank row) (:date row) (:amount row) (:comment row)
-                      (db/string-array (:tags row))
-                      (db/string-array (:hiddens row))])
+                     (db/one tx [delete-q bank d d]))
           insres   (for [batch (partition-all 1000 rows)]
                      (->> batch
                           (map mkrow)
-                          (sql/insert-multi! tx :report fields)
+                          (sql/insert-multi! tx table fields)
                           count))
           deleted  (apply + (map ::jdbc/update-count delres))
           inserted (apply + insres)]
