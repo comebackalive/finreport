@@ -312,8 +312,8 @@
                :name   #(let [cnt  (get % 14)
                               unit (get % 13)]
                           (if (and cnt (pos? cnt))
-                            (get % 12)
-                            (format "%s (%s %s)" (get % 12) cnt unit)))
+                            (format "%s (%s %s)" (get % 12) (long cnt) unit)
+                            (get % 12)))
                :target #(get % 11)}}})
 
 
@@ -396,7 +396,7 @@
   (prn (map #(.getColumnIndex %) (.getRow s 2)))
 
   (def w (take 2 x))
-  (parse-row (-> CONFIG :spending :fields) "UAH" 1 (first (drop 368 x)))
+  (parse-row (-> CONFIG :spending :fields) "UAH" 1 (first (drop 2 x)))
 
   (->> x (drop 5) first))
 
