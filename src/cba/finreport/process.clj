@@ -296,14 +296,18 @@
                  :comment #(get % 2)
                  :tags    #(parse-tags (get % 2))}}
 
-   :spending {:start #(str/includes? % "Дата")
+   :spending {:start #(str/includes? % "Постачальник")
               :skip  (constantly false)
               :fields
               {:id     (constantly "")
                :bank   (constantly "Spending")
-               :date   #(dt (date (get % 6)))
-               :amount #(parse-n (get % 8))
-               :name   #(get % 7)
+               :date   #(dt (date (get % 10)))
+               :amount #(parse-n (get % 16))
+               :name   #(let [cnt  (get % 14)
+                              unit (get % 13)]
+                          (if (str/blank? cnt)
+                            (get % 12)
+                            (format "%s (%s %s)" (get % 12) cnt unit)))
                :target #(get % 11)}}})
 
 
@@ -311,16 +315,14 @@
   (let [rows (into [] (take 15 data))
         g    (fn [x y] (some-> (get-in rows [x y]) str str/trim))]
     (cond
-      (= (g 0 0) "Внутрішній ID")                        :fondy
-      (= (g 10 14) "КТ рахунку (еквівалент)")            :oschad-ext
-      (= (g 0 0) "Назва Клієнта")                        :oschad
-      (= (g 1 6) "Сума еквівалент у гривні")             :privat-ext
-      (some-> (g 0 0)
-        (str/starts-with? "Виписка по рахунку"))         :privat
+      (= (g 0 0) "Внутрішній ID")                              :fondy
+      (= (g 10 14) "КТ рахунку (еквівалент)")                  :oschad-ext
+      (= (g 0 0) "Назва Клієнта")                              :oschad
+      (= (g 1 6) "Сума еквівалент у гривні")                   :privat-ext
+      (some-> (g 0 0) (str/starts-with? "Виписка по рахунку")) :privat
       (and (= (g 0 3) "Тип надходження")
-           (= (g 1 3) "готівка"))                        :cash
-      (some->
-        (g 1 0) (str/starts-with? "ВИТРАТИ НА ПРОЕКТИ")) :spending
+           (= (g 1 3) "готівка"))                              :cash
+      (= (g 0 0) "Постачальник")                               :spending
       :else
       (throw (ex-info "Unknown bank!" {:rows rows})))))
 
