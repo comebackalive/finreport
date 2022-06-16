@@ -2,7 +2,8 @@
   (:import [java.util Date]
            [java.time LocalDateTime LocalDate ZoneId]
            [java.time.format DateTimeFormatter DateTimeParseException]
-           [org.apache.poi.ss.usermodel WorkbookFactory Cell CellType DateUtil])
+           [org.apache.poi.ss.usermodel
+            WorkbookFactory Row Cell CellType DateUtil])
   (:require [clojure.java.io :as io]
             [clojure.string :as str]
             [clojure.data.csv :as csv]
@@ -53,11 +54,16 @@
         #"^\d+$"     (BigDecimal. s)
         #",\d{1,}$"  (BigDecimal.
                        (-> s
-                           (str/replace #"[ \.]" "")
+                           ;; Zs is a "Space Separator" Unicode class
+                           (str/replace #"[\p{Zs}\.\\]" "")
                            (str/replace "," ".")))
         #"\.\d{1,}$" (BigDecimal.
-                       (str/replace s #"[ ,]" ""))
+                       (str/replace s #"[\p{Zs},\\]" ""))
         (throw (Exception. (str "cannot parse number " s)))))))
+
+
+(comment
+  (parse-n "325 041,63"))
 
 
 (def TAG-RE #"(?u)#(\p{L}[\p{L}\d_\-\.]*[\p{L}\d])")
@@ -305,7 +311,7 @@
                :amount #(parse-n (get % 16))
                :name   #(let [cnt  (get % 14)
                               unit (get % 13)]
-                          (if (str/blank? cnt)
+                          (if (and cnt (pos? cnt))
                             (get % 12)
                             (format "%s (%s %s)" (get % 12) cnt unit)))
                :target #(get % 11)}}})
@@ -367,19 +373,30 @@
 (defn read-xls [path]
   (let [s  (io/input-stream path)
         wb (WorkbookFactory/create s)]
-    (for [sheet (iterator-seq (.sheetIterator wb))
-          row   sheet]
-      (mapv read-xls-cell row))))
+    (for [sheet    (iterator-seq (.sheetIterator wb))
+          ^Row row sheet]
+      (mapv #(when-let [cell (.getCell row %)]
+               (read-xls-cell cell))
+        (range (.getLastCellNum row))))))
 
 
 (comment
   (def x (read-xls "БФ_Приват_злотий_29_03_2022.xls"))
   (def x (read-xls "/Users/piranha/dev/misc/pzh-finance/clj-finreport/Ощад_28_02_2022.xlsx"))
-  (def x (read-xls "/Users/piranha/Downloads/Витрати_2021_О-З_розбивка_по_проектах_для звіту.xlsx"))
-  (def w (drop-while #(not ((-> CONFIG :spending :start) %)) x))
-  (def q (first (drop 6 w)))
+  (def x (read-xls "/Users/piranha/Downloads/АКТИ+Рахунки _Леся_2022.xlsx"))
+  (def wb (-> "/Users/piranha/Downloads/АКТИ+Рахунки _Леся_2022.xlsx"
+              io/input-stream
+              WorkbookFactory/create))
+  (def s (.getSheetAt wb 0))
+  (def r (.getRow s 2))
+  (.getFirstCellNum r)
+  (.getLastCellNum r)
 
-  (parse-row (-> CONFIG :spending :fields) "UAH" 1 q)
+  (prn (map identity (.getRow s 0)))
+  (prn (map #(.getColumnIndex %) (.getRow s 2)))
+
+  (def w (take 2 x))
+  (parse-row (-> CONFIG :spending :fields) "UAH" 1 (first (drop 368 x)))
 
   (->> x (drop 5) first))
 
@@ -425,17 +442,23 @@
         *skipped              (atom [])
 
         func (fn [i row]
-               (let [skip? (or (every? nothing? (take 3 row))
-                               (< (count row) 3)
-                               (skip-fn row))
+               (let [skip? (cond
+                             (every? nothing? row) :empty-row
+                             (< (count row) 3)     :too-short
+                             (skip-fn row)         :skipped
+                             :else                 nil)
                      res   (when-not skip?
-                             (parse-row fields currency i row))]
-                 (if-not (or (nil? (:amount res))
-                             (neg? (:amount res)))
-                   res
+                             (parse-row fields currency i row))
+                     skip? (cond
+                             skip?                skip?
+                             (nil? (:amount res)) :no-amount
+                             (neg? (:amount res)) :neg-amount
+                             :else                nil)]
+                 (if skip?
                    (do
-                     (swap! *skipped conj row)
-                     nil))))
+                     (swap! *skipped conj [skip? row])
+                     nil)
+                   res)))
         xf   (comp
                (map-indexed func)
                (remove nil?))]
