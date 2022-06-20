@@ -11,7 +11,10 @@
 
             [cba.config :as config]
             [cba.core :as core]
-            [cba.finreport.process :as process]))
+            [cba.finreport.process :as process]
+            [next.jdbc :as jdbc]
+            [cba.finreport.db :as db]
+            [next.jdbc.sql :as sql]))
 
 
 (set! *warn-on-reflection* true)
@@ -115,9 +118,33 @@
      :hiddens (:hiddens data)}))
 
 
+(defn mkrow [fname row]
+  [(:id row) fname (:bank row) (:date row) (:amount row) (:comment row)
+   (db/string-array (:tags row))
+   (db/string-array (:hiddens row))])
+
+
+(def UPSERT
+  "ON CONFLICT (order_id)
+   DO UPDATE SET amount = EXCLUDED.amount, comment = EXCLUDED.comment
+   RETURNING (xmax = 0) AS inserted")
+
+
+(defn write-db [fname rows]
+  (jdbc/with-transaction [tx db/conn]
+    (let [fields (into [:order_id] (:donate process/FIELDS))
+          mkrow  (partial mkrow fname)
+          insres (sql/insert-multi! tx :report fields (map mkrow rows)
+                   {:batch      true
+                    :batch-size 1000
+                    :suffix     UPSERT})]
+      {:delete   (count (remove :inserted insres))
+       :inserted (count insres)})))
+
+
 (defn store! [from to]
   (let [res (get-report {:from from :to to})]
-    (process/write-db "solidgate api" (map report->row res))))
+    (write-db "solidgate api" (map report->row res))))
 
 
 (defn cron []
@@ -128,5 +155,11 @@
 
 
 (comment
+  (doseq [i (range 1 20)]
+    (store!
+      (format "2022-06-%02d 00:00:00" i)
+      (format "2022-06-%02d 00:00:00" (inc i)) ))
+  (store! "2022-06-17 00:00:00" "2022-06-18 00:00:00")
+  (store! "2022-06-18 00:00:00" "2022-06-19 00:00:00")
   (def q (get-report {:from "2022-06-17 00:00:00"
-                     :to   "2022-06-18 00:00:00"})))
+                      :to   "2022-06-18 00:00:00"})))

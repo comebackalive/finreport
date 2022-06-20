@@ -531,16 +531,20 @@
                          (db/string-array (:tags row))
                          (db/string-array (:hiddens row))]))
 
-          delete-q (format DELETE-Q (name table))
-          delres   (for [[bank d] (bank-days rows)]
-                     (db/one tx [delete-q bank d d]))
-          insres   (for [batch (partition-all 1000 rows)]
-                     (->> batch
-                          (map mkrow)
-                          (sql/insert-multi! tx table fields)
-                          count))
-          deleted  (apply + (map ::jdbc/update-count delres))
-          inserted (apply + insres)]
+          delete-q   (format DELETE-Q (name table))
+          delres     (for [[bank d] (bank-days rows)]
+                       (db/one tx [delete-q bank d d]))
+          insres     (sql/insert-multi! tx table fields (map mkrow rows)
+                       {:batch      true
+                        :batch-size 1000
+                        :suffix     "RETURNING 1"})
+          #_#_insres (for [batch (partition-all 1000 rows)]
+                         (->> batch
+                              (map mkrow)
+                              (sql/insert-multi! tx table fields)
+                              count))
+          deleted    (apply + (map ::jdbc/update-count delres))
+          inserted   (count insres)]
       {:deleted  deleted
        :inserted inserted})))
 
