@@ -82,23 +82,30 @@
     (str/split src #"~")))
 
 
+(defn to-uah [currency amount]
+  (case currency
+    nil   (or amount 0)
+    "UAH" (/ amount 100.0)
+    "USD" (* amount 0.2925)
+    "EUR" (* amount 0.3161)
+    (throw (ex-info (str "Can't process tx currency " currency)
+             {:currency currency}))))
+
+
 (defn report->row [order]
-  (let [tx       (-> order :transactions first)
-        data     (merge-with into
-                   (process/parse-card-oid (:order_id order))
-                   (some-> (:traffic_source order) parse-source))
-        currency (:processing_currency order)]
+  (let [tx   (-> order :transactions first)
+        data (merge-with into
+               (process/parse-card-oid (:order_id order))
+               (some-> (:traffic_source order) parse-source))]
     {:id      (:order_id order)
      :bank    (if (= (:type order) "recurring")
                 "Solidgate Sub"
                 "Solidgate Card")
      :date    (process/dt dt-fmt (:created_at order))
-     :amount  (case currency
-                "UAH" (/ (:processing_amount order) 100.0)
-                "USD" (* (:processing_amount order) 0.2925)
-                "EUR" (* (:processing_amount order) 0.3161)
-                (throw (ex-info (str "Can't process tx currency " currency)
-                         {:processing_currency currency})))
+     :amount  (- (to-uah
+                   (:processing_currency order) (:processing_amount order))
+                 (to-uah
+                   (:finance_fee_currency tx) (:finance_fee_amount tx)))
      :comment (format "%s ***%s (%s %s)"
                 (-> tx :card :country)
                 (last (str/split (-> tx :card :number) #"XXX"))
@@ -121,5 +128,5 @@
 
 
 (comment
-  (time (get-report {:from "2022-05-29 00:00:00"
-                     :to   "2022-05-31 00:00:00"})))
+  (def q (get-report {:from "2022-06-17 00:00:00"
+                     :to   "2022-06-18 00:00:00"})))
