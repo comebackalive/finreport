@@ -16,7 +16,8 @@
             [cba.config :as config]
             [cba.core :as core]
             [cba.finreport.process :as process]
-            [ring.util.codec :as codec]))
+            [ring.util.codec :as codec]
+            [clojure.string :as str]))
 
 
 (def *s3 (aws/client {:api    :s3
@@ -85,12 +86,16 @@
        (format "збережено в архіві: %s, зайняло %sмс"
          cb-res
          total)
+       [:br]
+       (format "Завантажено %s рядків, було в базі %s."
+           (:inserted res) (:deleted res))
+         (when (:days res)
+           (str " Дні: "
+             (str/join ", "
+               (for [[[_ day] cnt] (:days res)] (format "%s (%s рядків)" day cnt)))))
        [:details
         [:summary
-         (format "Завантажено %s рядків, було в базі %s, пропущені (%s):"
-           (:inserted res)
-           (:deleted res)
-           (count (:skipped res)))]
+         (format "Пропущено %s рядків:" (count (:skipped res)))]
         [:table.skipped
          (for [[reason row] (:skipped res)]
            [:tr

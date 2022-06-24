@@ -292,11 +292,13 @@
                              (format "%s ***%s (%s %s)"
                                country card (fmt-amount amount) currency))
                  :tags    #(:tags (parse-card-oid (get % 6)))}}
-   :cash       {:start #(str/includes? % "Тип надходження")
+   :manual     {:start #(str/includes? % "Тип надходження")
                 :skip  (constantly false)
                 :fields
                 {:id      (constantly "")
-                 :bank    (constantly "Cash")
+                 :bank    #(if (= "готівка" (get % 3))
+                             "Cash"
+                             (get % 3))
                  :date    #(dt (get % 0))
                  :amount  #(parse-n (get % 1))
                  :comment #(get % 2)
@@ -326,8 +328,7 @@
       (= (g 0 0) "Назва Клієнта")                              :oschad
       (= (g 1 6) "Сума еквівалент у гривні")                   :privat-ext
       (some-> (g 0 0) (str/starts-with? "Виписка по рахунку")) :privat
-      (and (= (g 0 3) "Тип надходження")
-           (= (g 1 3) "готівка"))                              :cash
+      (= (g 0 3) "Тип надходження")                            :manual
       (= (g 0 0) "Постачальник")                               :spending
       :else
       (throw (ex-info "Unknown bank!" {:rows rows})))))
@@ -493,12 +494,11 @@
 
 
 (defn bank-days [rows]
-  (persistent!
-    (reduce
-      (fn [ret row]
-        (conj! ret [(:bank row) (date (:date row))]))
-      (transient #{})
-      rows)))
+  (reduce
+    (fn [m row]
+      (update m [(:bank row) (date (:date row))] (fnil inc 0)))
+    {}
+    rows))
 
 
 (def DELETE-Q
@@ -531,22 +531,20 @@
                          (db/string-array (:tags row))
                          (db/string-array (:hiddens row))]))
 
-          delete-q   (format DELETE-Q (name table))
-          delres     (for [[bank d] (bank-days rows)]
-                       (db/one tx [delete-q bank d d]))
-          insres     (sql/insert-multi! tx table fields (map mkrow rows)
-                       {:batch      true
-                        :batch-size 1000
-                        :suffix     "RETURNING 1"})
-          #_#_insres (for [batch (partition-all 1000 rows)]
-                         (->> batch
-                              (map mkrow)
-                              (sql/insert-multi! tx table fields)
-                              count))
-          deleted    (apply + (map ::jdbc/update-count delres))
-          inserted   (count insres)]
+          days     (bank-days rows)
+          delete-q (format DELETE-Q (name table))
+          delres   (for [[bank d] (keys days)]
+                     (db/one tx [delete-q bank d d]))
+          insres   (for [batch (partition-all 1000 rows)]
+                     (->> batch
+                          (map mkrow)
+                          (sql/insert-multi! tx table fields)
+                          count))
+          deleted  (apply + (map ::jdbc/update-count delres))
+          inserted (apply + insres)]
       {:deleted  deleted
-       :inserted inserted})))
+       :inserted inserted
+       :days     days})))
 
 
 (defn process-and-store [mode path content]
