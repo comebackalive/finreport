@@ -1,6 +1,7 @@
 (ns cba.finreport.db
   (:import [java.net URI]
-           [java.sql Array PreparedStatement]
+           [java.sql Array PreparedStatement Timestamp]
+           [java.time ZonedDateTime]
            [org.postgresql.ds PGSimpleDataSource])
   (:require [clojure.string :as str]
             [mount.core :as mount]
@@ -89,4 +90,8 @@
 (extend-protocol jdbc-p/SettableParameter
   clojure.lang.PersistentVector
   (set-parameter [v ^PreparedStatement s ^long i]
-    (.setArray s i v)))
+    (.setArray s i v))
+
+  ZonedDateTime
+  (set-parameter [v ^PreparedStatement s ^long i]
+    (.setTimestamp s i (Timestamp/from (.toInstant v)))))

@@ -82,7 +82,7 @@
      :bank    (if (:sub data)
                 "Fondy Sub"
                 "Fondy")
-     :date    (process/dt (:order_timestart src))
+     :date    (process/kyiv (process/dt (:order_timestart src)))
      :amount  (or (process/parse-n (:settlement_amount src))
                   ;; embed commission, newer tx dont have settlement_amount yet
                   (* 0.979 (process/parse-n (:actual_amount src))))

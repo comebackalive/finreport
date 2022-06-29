@@ -1,6 +1,6 @@
 (ns cba.finreport.process
   (:import [java.util Date]
-           [java.time LocalDateTime LocalDate ZoneId]
+           [java.time LocalDateTime ZonedDateTime LocalDate ZoneId]
            [java.time.format DateTimeFormatter DateTimeParseException]
            [org.apache.poi.ss.usermodel
             WorkbookFactory Row Cell CellType DateUtil])
@@ -23,6 +23,7 @@
 (def fondy2-dt-fmt (DateTimeFormatter/ofPattern "yyyy-MM-dd HH:mm:ss"))
 (def date-fmt (DateTimeFormatter/ofPattern "dd.MM.yyyy"))
 
+
 (defn dt
   ([fmt s]
    (LocalDateTime/parse s fmt))
@@ -41,9 +42,14 @@
   (cond
     (string? s)                 (LocalDate/parse s date-fmt)
     (instance? LocalDateTime s) (.toLocalDate ^LocalDateTime s)
+    (instance? ZonedDateTime s) (.toLocalDate ^ZonedDateTime s)
     (instance? Date s)          (LocalDate/ofInstant (.toInstant ^Date s)
                                   (ZoneId/systemDefault))
     :else                       s))
+
+
+(defn kyiv [^LocalDateTime dt] (.atZone dt (ZoneId/of "Europe/Kiev")))
+(defn gmt  [^LocalDateTime dt] (.atZone dt (ZoneId/of "GMT")))
 
 
 (defn parse-n [s]
@@ -226,7 +232,7 @@
                 :fields
                 {:id      #(get % 2)
                  :bank    (constantly "Oschad UAH")
-                 :date    #(dt (date (get % 4)))
+                 :date    #(kyiv (dt (date (get % 4))))
                  :amount  #(parse-n (get % 10))
                  :comment #(make-comment (get % 13) (get % 19))
                  :tags    #(parse-tags (get % 19))}}
@@ -241,7 +247,7 @@
                 :fields
                 {:id      #(get % 1)
                  :bank    (fn [_] (str "Oschad " *currency*))
-                 :date    #(dt (date (get % 3)))
+                 :date    #(kyiv (dt (date (get % 3))))
                  :amount  #(parse-n (get % 14))
                  :comment #(let [msg    (cleanup-ext (get % 24))
                                  amount (get % 12)]
@@ -254,7 +260,7 @@
                 :fields
                 {:id      #(get % 0)
                  :bank    (constantly "Privat UAH")
-                 :date    #(dt (str (get % 1) " " (get % 2)))
+                 :date    #(kyiv (dt (str (get % 1) " " (get % 2))))
                  :amount  #(parse-n (get % 3))
                  :comment #(make-comment (get % 7) (get % 5))
                  :tags    #(parse-tags (get % 5))}}
@@ -267,7 +273,7 @@
                 :fields
                 {:id      #(get % 0)
                  :bank    #(str "Privat " (get % 4))
-                 :date    #(dt (str (get % 1) " " (get % 2)))
+                 :date    #(kyiv (dt (str (get % 1) " " (get % 2))))
                  :amount  #(parse-n (get % 6))
                  :comment #(let [message  (cleanup-ext (get % 7))
                                  amount   (get % 3)
@@ -282,7 +288,7 @@
                  :bank    #(if (str/starts-with? (get % 6) "SUB-")
                              "Fondy Sub"
                              "Fondy")
-                 :date    #(dt (get % 1))
+                 :date    #(kyiv (dt (get % 1)))
                  :amount  #(parse-n (get % 10))
                  :comment #(let [amount   (get % 4)
                                  currency (get % 5)
@@ -299,7 +305,7 @@
                  :bank    #(if (= "готівка" (get % 3))
                              "Cash"
                              (get % 3))
-                 :date    #(dt (get % 0))
+                 :date    #(kyiv (dt (get % 0)))
                  :amount  #(parse-n (get % 1))
                  :comment #(get % 2)
                  :tags    #(parse-tags (get % 2))}}
@@ -309,7 +315,7 @@
               :fields
               {:id     (constantly "")
                :bank   (constantly "Spending")
-               :date   #(dt (date (get % 10)))
+               :date   #(kyiv (dt (date (get % 10))))
                :amount #(parse-n (get % 16))
                :name   #(let [cnt  (get % 14)
                               unit (get % 13)]

@@ -104,7 +104,7 @@
      :bank    (if (= (:type order) "recurring")
                 "Solidgate Sub"
                 "Solidgate Card")
-     :date    (process/dt dt-fmt (:created_at order))
+     :date    (process/gmt (process/dt dt-fmt (:created_at order)))
      :amount  (- (to-uah
                    (:processing_currency order) (:processing_amount order))
                  (to-uah
