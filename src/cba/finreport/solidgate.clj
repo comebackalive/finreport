@@ -1,5 +1,5 @@
 (ns cba.finreport.solidgate
-  (:import [java.time LocalDate]
+  (:import [java.time LocalDate LocalDateTime]
            [java.time.format DateTimeFormatter]
            [javax.crypto Mac]
            [javax.crypto.spec SecretKeySpec])
@@ -148,10 +148,16 @@
 
 
 (defn cron []
-  (let [d (LocalDate/now)]
-    (store!
-      (str (.minusDays d 1) " 00:00:00")
-      (str (.plusDays d 1) " 00:00:00"))))
+  (let [dt (LocalDateTime/now)
+        d  (LocalDate/now)]
+    (if (= 1 (.getHour dt))
+      ;; update old data in the time of downtime
+      (store!
+        (str (.minusDays d 3) " 00:00:00")
+        (str (.plusDays d 1) " 00:00:00"))
+      (store!
+        (str d " 00:00:00")
+        (str (.plusDays d 1) " 00:00:00")))))
 
 
 (comment
