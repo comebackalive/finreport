@@ -8,13 +8,13 @@
             [org.httpkit.client :as http]
             [cheshire.core :as json]
             [clojure.tools.logging :as log]
+            [next.jdbc :as jdbc]
+            [next.jdbc.sql :as sql]
 
             [cba.config :as config]
             [cba.core :as core]
             [cba.finreport.process :as process]
-            [next.jdbc :as jdbc]
-            [cba.finreport.db :as db]
-            [next.jdbc.sql :as sql]))
+            [cba.finreport.db :as db]))
 
 
 (set! *warn-on-reflection* true)

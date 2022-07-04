@@ -7,7 +7,8 @@
 
             [cba.config :as config]
             [cba.core :as core]
-            [cba.finreport.process :as process]))
+            [cba.finreport.process :as process]
+            [cba.finreport.solidgate :as solidgate]))
 
 
 (set! *warn-on-reflection* true)
@@ -126,10 +127,10 @@
   (let [d   (LocalDate/now)
         res (get-report {:from (str (.minusDays d 1))
                          :to   (str d)})]
-    (process/write-db "fondy api" (map report->row res))))
+    (solidgate/write-db "fondy api" (map report->row res))))
 
 
 (comment
-  (def q (get-report {:from "2022-04-27" :to "2022-04-27"}))
+  (def q (get-report {:from "2022-06-30" :to "2022-06-30"}))
 
-  (process/write-db "fondy api" q))
+  (solidgate/write-db "fondy api" (map report->row q)))
