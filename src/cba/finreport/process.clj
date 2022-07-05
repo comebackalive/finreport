@@ -36,6 +36,8 @@
                                        (catch DateTimeParseException _))
                                      (recur (rest fmts)))))
      (instance? LocalDate s) (.atStartOfDay ^LocalDate s)
+     (instance? Date s)      (LocalDateTime/ofInstant (.toInstant ^Date s)
+                               (ZoneId/systemDefault))
      :else                   s)))
 
 (defn date [s]
