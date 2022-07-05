@@ -274,6 +274,7 @@
                           (or (= msg "From for") ; this is when payments return
                               (str/starts-with? msg "Повернення ")
                               (str/starts-with? msg "Купiвля")
+                              (str/starts-with? msg "Конвертац")
                               (str/includes? msg "технiчне проведення усунення розбалансу")))
                 :fields
                 {:id      #(get % 0)
