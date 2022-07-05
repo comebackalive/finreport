@@ -257,7 +257,9 @@
                                msg (fmt-amount amount) *currency*))
                  :tags    #(parse-tags (get % 24))}}
    :privat     {:start #(str/includes? % "Дата проводки")
-                :skip  #(or (some-> (get % 7) (str/starts-with? "Повернення "))
+                :skip  #(or (when-let [msg (get % 7)]
+                              (or (str/starts-with? msg "Повернення ")
+                                  (str/starts-with? msg "Конвертац")))
                             (contains? OWN-ACCOUNTS (get % 8)))
                 :fields
                 {:id      #(get % 0)
@@ -268,10 +270,11 @@
                  :tags    #(parse-tags (get % 5))}}
    :privat-ext {:start #(str/includes? % "Дата проводки")
                 ;; be careful, it has latin i
-                :skip  #(let [msg (get % 7)]
+                :skip  #(when-let [msg (get % 7)]
                           (or (= msg "From for") ; this is when payments return
-                              (some-> msg (str/starts-with? "Купiвля"))
-                              (some-> msg (str/includes? "технiчне проведення усунення розбалансу"))))
+                              (str/starts-with? msg "Повернення ")
+                              (str/starts-with? msg "Купiвля")
+                              (str/includes? msg "технiчне проведення усунення розбалансу")))
                 :fields
                 {:id      #(get % 0)
                  :bank    #(str "Privat " (get % 4))
