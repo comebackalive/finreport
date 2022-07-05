@@ -226,8 +226,7 @@
                                "Іщенко Максим Федорович"}
                               (get % 13))
                             (some-> (get % 13) (str/starts-with? "Плат.интер-эквайрин через LiqPay"))
-                            ;; "коштів" буває з латинською "i"
-                            (some-> (get % 19) (str/starts-with? "Повернення кошт"))
+                            (some-> (get % 19) (str/starts-with? "Повернення "))
                             (some->> (get % 19) (re-find #"(?i)нев[іi]рний код отримувача"))
                             ;; no date - no transaction
                             (= (get % 4) nil))
@@ -240,8 +239,7 @@
                  :tags    #(parse-tags (get % 19))}}
    :oschad-ext {:start    #(str/includes? % "№ п/п")
                 :skip     #(or (nil? (get % 1))
-                               ;; "коштів" буває з латинською "i"
-                               (some-> (get % 24) (str/starts-with? "Повернення кошт")))
+                               (some-> (get % 24) (str/starts-with? "Повернення ")))
                 :currency (fn [lazy-rows]
                             (->> (get (nth lazy-rows 5) 4)
                                  (re-find #"\((\w+)\)")
@@ -257,7 +255,7 @@
                                msg (fmt-amount amount) *currency*))
                  :tags    #(parse-tags (get % 24))}}
    :privat     {:start #(str/includes? % "Дата проводки")
-                :skip  #(or (when-let [msg (get % 7)]
+                :skip  #(or (when-let [msg (get % 5)]
                               (or (str/starts-with? msg "Повернення ")
                                   (str/starts-with? msg "Конвертац")))
                             (contains? OWN-ACCOUNTS (get % 8)))
