@@ -51,10 +51,10 @@
     :else                       s))
 
 
-(defn kyiv [^LocalDateTime dt] (.atZone dt (ZoneId/of "Europe/Kiev")))
-(defn gmt  [^LocalDateTime dt] (.atZone dt (ZoneId/of "GMT")))
-(defn day-start [^ZonedDateTime dt] (.truncatedTo dt ChronoUnit/DAYS))
-(defn day-end   [^ZonedDateTime dt] (day-start (.plusDays dt 1)))
+(defn kyiv ^ZonedDateTime [^LocalDateTime dt] (.atZone dt (ZoneId/of "Europe/Kiev")))
+(defn gmt  ^ZonedDateTime [^LocalDateTime dt] (.atZone dt (ZoneId/of "GMT")))
+(defn day-start ^ZonedDateTime [^ZonedDateTime dt] (.truncatedTo dt ChronoUnit/DAYS))
+(defn day-end   ^ZonedDateTime [^ZonedDateTime dt] (day-start (.plusDays dt 1)))
 
 
 (defn parse-n [s]

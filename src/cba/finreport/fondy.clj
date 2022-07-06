@@ -125,16 +125,17 @@
 
 (defn store! [from to]
   (let [res (get-report {:from from :to to})]
-    (solidgate/write-db "solidgate api" (map report->row res))))
+    (solidgate/write-db :report "solidgate api" (map report->row res))))
 
 
 
-(defn cron []
-  (let [d (LocalDate/now)]
-    (store! (str (.minusDays d 3)) (str d))))
+(defn cron [i]
+  (when (zero? (mod i 60))
+    (let [d (LocalDate/now)]
+      (store! (str (.minusDays d 3)) (str d)))))
 
 
 (comment
   (def q (get-report {:from "2022-06-30" :to "2022-06-30"}))
 
-  (solidgate/write-db "fondy api" (map report->row q)))
+  (solidgate/write-db :report "fondy api" (map report->row q)))

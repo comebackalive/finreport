@@ -43,6 +43,10 @@
                       "Solidgate public key"))
 (def SOLIDGATE-KEY #(get-env "SOLIDGATE_KEY"
                       "Solidgate secret key"))
+(def SOLIDGATE-GO-ID  #(get-env "SOLIDGATE_GO_ID"
+                      "Solidgate public key"))
+(def SOLIDGATE-GO-KEY #(get-env "SOLIDGATE_GO_KEY"
+                      "Solidgate secret key"))
 (def TIMEOUT       #(-> (get-env "TIMEOUT" "60000"
                           "HTTP timeout")
                         str/trim

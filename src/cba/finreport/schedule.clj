@@ -3,7 +3,8 @@
 
             [cba.finreport.fondy :as fondy]
             [mount.core :as mount]
-            [cba.finreport.solidgate :as solidgate]))
+            [cba.finreport.solidgate :as solidgate]
+            [cba.config :as config]))
 
 
 (defn run-schedule []
@@ -12,21 +13,25 @@
                              1000000))
         t    (Thread.
                (fn []
-                 (if @stop
-                   (log/infof "schedule %s: stop signal" id)
+                 (loop [i 0]
+                   (if @stop
+                     (log/infof "schedule %s: stop signal" id)
 
-                   (do
-                     (log/debugf "schedule %s" id)
-                     (try
-                       (fondy/cron)
-                       (solidgate/cron)
-                       (catch Exception e
-                         (log/error e "cron error")))
-                     (try
-                       (Thread/sleep (* 60 1000))
-                       (catch InterruptedException _
-                         (log/infof "schedule %s: sleep interrupt" id)))
-                     (recur)))))]
+                     (let [next-inc (if (config/DEV)
+                                      (inc (rand-int 150))
+                                      1)]
+                       (log/debugf "schedule %s (next in %ss)" id next-inc)
+                       (try
+                         (fondy/cron i)
+                         (solidgate/cron i :charity)
+                         (solidgate/cron i :go)
+                         (catch Exception e
+                           (log/error e "cron error")))
+                       (try
+                         (Thread/sleep (* 1000 next-inc))
+                         (catch InterruptedException _
+                           (log/infof "schedule %s: sleep interrupt" id)))
+                       (recur (+ i next-inc)))))))]
     (log/infof "schedule %s: start" id)
     (.start t)
     (fn []
