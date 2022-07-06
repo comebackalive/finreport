@@ -1,6 +1,7 @@
 (ns cba.finreport.process
   (:import [java.util Date]
            [java.time LocalDateTime ZonedDateTime LocalDate ZoneId]
+           [java.time.temporal ChronoUnit]
            [java.time.format DateTimeFormatter DateTimeParseException]
            [org.apache.poi.ss.usermodel
             WorkbookFactory Row Cell CellType DateUtil])
@@ -52,6 +53,8 @@
 
 (defn kyiv [^LocalDateTime dt] (.atZone dt (ZoneId/of "Europe/Kiev")))
 (defn gmt  [^LocalDateTime dt] (.atZone dt (ZoneId/of "GMT")))
+(defn day-start [^ZonedDateTime dt] (.truncatedTo dt ChronoUnit/DAYS))
+(defn day-end   [^ZonedDateTime dt] (day-start (.plusDays dt 1)))
 
 
 (defn parse-n [s]
@@ -506,7 +509,7 @@
 (defn bank-days [rows]
   (reduce
     (fn [m row]
-      (update m [(:bank row) (date (:date row))] (fnil inc 0)))
+      (update m [(:bank row) (day-start (:date row))] (fnil inc 0)))
     {}
     rows))
 
@@ -514,8 +517,8 @@
 (def DELETE-Q
   "delete from %s
     where bank = ?
-      and date >= ?::date
-      and date < (?::date + '1 day'::interval)")
+      and date >= ?::timestamp
+      and date < ?::timestamp")
 
 
 (def FIELDS
@@ -544,7 +547,7 @@
           days     (bank-days rows)
           delete-q (format DELETE-Q (name table))
           delres   (for [[bank d] (keys days)]
-                     (db/one tx [delete-q bank d d]))
+                     (db/one tx [delete-q bank (day-start d) (day-end d)]))
           insres   (for [batch (partition-all 1000 rows)]
                      (->> batch
                           (map mkrow)
@@ -579,8 +582,8 @@
       (process-and-store mode path nil))))
 
 (comment
-  (def x (read-xls (io/file "/Users/piranha/Downloads/БФ_ощад_грн_1-24 квітня.Xlsx")))
-  (def x (process "/Users/piranha/dev/misc/pzh-finance/clj-finreport/49949__1622114.xlsx" nil))
+  (def x (read-xls (io/file "/Users/piranha/Downloads/БФ_Приват_грн_01_липня.xls")))
+  (def x (process "/Users/piranha/Downloads/БФ_Приват_грн_01_липня.xls" nil))
 
   (time (write-db "49949__1622114.xlsx" x))
 

@@ -87,12 +87,13 @@
          cb-res
          total)
        [:br]
-       (format "Завантажено %s рядків, було в базі %s."
+       (format "Завантажено %s рядків, було в базі %s. "
            (:inserted res) (:deleted res))
-         (when (:days res)
-           (str " Дні: "
-             (str/join ", "
-               (for [[[_ day] cnt] (:days res)] (format "%s (%s рядків)" day cnt)))))
+       (when (:days res)
+         (list
+           "Дні: "
+           (for [[[_ day] cnt] (:days res)]
+             [:span [:b (.toLocalDate day)] (format " (%s рядків), " cnt)])))
        [:details
         [:summary
          (format "Пропущено %s рядків:" (count (:skipped res)))]
