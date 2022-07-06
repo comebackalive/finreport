@@ -4,7 +4,7 @@
   https://payment-page.solidgate.com/charity/comebackalive/dZNqJgD?traffic_source=XXX
 
   GO page:
-  https://payment-page.solidgate.com/charity/comebackalive/5gAEK2D
+  https://payment-page.solidgate.com/charity/comebackalive/5gAEK2D?traffic_source=XXX
   "
   (:import [java.time LocalDate LocalDateTime ZoneOffset]
            [java.time.format DateTimeFormatter]
@@ -153,10 +153,12 @@
   (jdbc/with-transaction [tx db/conn]
     (let [fields (into [:order_id] (:donate process/FIELDS))
           mkrow  (partial mkrow fname)
-          insres (sql/insert-multi! tx table fields (map mkrow rows)
-                   {:batch      true
-                    :batch-size 1000
-                    :suffix     UPSERT})]
+          insres (into [] cat
+                   (for [batch (partition-all 1000 rows)]
+                     (sql/insert-multi! tx table fields (map mkrow batch)
+                       {:batch      true
+                        :batch-size 1000
+                        :suffix     UPSERT})))]
       {:delete   (count (remove :inserted insres))
        :inserted (count insres)})))
 
@@ -199,4 +201,14 @@
   (store! :charity "2022-06-18 00:00:00" "2022-06-19 00:00:00")
   (def q (get-report {:from "2022-06-17 00:00:00"
                       :to   "2022-06-18 00:00:00"
-                      :auth (charity-auth)})))
+                      :auth (charity-auth)}))
+
+
+  (doseq [d (-> (.datesUntil
+                  (LocalDate/parse "2022-05-06")
+                  (LocalDate/parse "2022-07-06"))
+                .iterator
+                iterator-seq)]
+    (prn (str d) (store! :charity
+                   (str d " 00:00:00")
+                   (str (.plusDays d 1) " 00:00:00")))))

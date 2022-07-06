@@ -549,10 +549,8 @@
           delres   (for [[bank d] (keys days)]
                      (db/one tx [delete-q bank (day-start d) (day-end d)]))
           insres   (for [batch (partition-all 1000 rows)]
-                     (->> batch
-                          (map mkrow)
-                          (sql/insert-multi! tx table fields)
-                          count))
+                     (count
+                       (sql/insert-multi! tx table fields (map mkrow batch))))
           deleted  (apply + (map ::jdbc/update-count delres))
           inserted (apply + insres)]
       {:deleted  deleted

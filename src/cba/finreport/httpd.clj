@@ -235,3 +235,13 @@
 (mount/defstate httpd
   :start (start)
   :stop (httpd))
+
+
+(comment
+
+  (def files (-> (slurp "load-files") (str/split-lines)))
+  (doseq [f files]
+    (let [start (System/currentTimeMillis)
+          res   (process/process-and-store :db f (io/file (str "archive/" f)))
+          total (- (System/currentTimeMillis) start)]
+      (println f (str total "ms") (select-keys res [:deleted :inserted])))))

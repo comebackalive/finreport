@@ -125,7 +125,7 @@
 
 (defn store! [from to]
   (let [res (get-report {:from from :to to})]
-    (solidgate/write-db :report "solidgate api" (map report->row res))))
+    (solidgate/write-db :report "fondy api" (map report->row res))))
 
 
 
@@ -138,4 +138,11 @@
 (comment
   (def q (get-report {:from "2022-06-30" :to "2022-06-30"}))
 
-  (solidgate/write-db :report "fondy api" (map report->row q)))
+  (solidgate/write-db :report "fondy api" (map report->row q))
+
+  (doseq [d (-> (.datesUntil
+                  (LocalDate/parse "2022-05-07")
+                  (LocalDate/parse "2022-07-06"))
+                .iterator
+                iterator-seq)]
+    (prn (str d) (store! (str d) (str d)))))
