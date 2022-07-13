@@ -99,15 +99,16 @@
 (defn get-report [{:keys [from to onpage]
                    :or   {onpage 500}}]
   (let [token (get-token!)
-        res   (iteration
+        res (for [merchant (config/FONDY-APP-MERCHANTS)]
+              (iteration
                 (fn [page]
                   (req! "/extend/company/report/" {:token token}
                     {:filters
                      [{:s "order_timestart" :m "from" :v from}
-                      {:s "order_timestart" :m "to"   :v to}
+                      {:s "order_timestart" :m "to" :v to}
                       ;; handle "reversed" if necessary
-                      {:s "order_status"    :m "eq"   :v "approved"}]
-                     :merchant_id (config/FONDY-ID)
+                      {:s "order_status" :m "eq" :v "approved"}]
+                     :merchant_id merchant
                      :report_id   745
                      :on_page     onpage
                      :page        page}))
@@ -119,8 +120,8 @@
                               (inc (:rows_page res)))))
                  :vf    (fn [res]
                           (let [fields (mapv keyword (:fields res))]
-                            (map #(zipmap fields %) (:data res))))})]
-    (into [] cat res)))
+                            (map #(zipmap fields %) (:data res))))}))]
+    (into [] (comp cat cat (core/distinct-by :order_id)) res)))
 
 
 (defn store! [from to]
@@ -136,13 +137,18 @@
 
 
 (comment
-  (def q (get-report {:from "2022-06-30" :to "2022-06-30"}))
+  (def q (get-report {:from "2022-01-01" :to "2022-01-01"}))
+  (count q)
+  (first q)
+  (apply + (map (comp parse-double :actual_amount) q))
+
+  (map :order_id q)
 
   (solidgate/write-db :report "fondy api" (map report->row q))
 
   (doseq [d (-> (.datesUntil
-                  (LocalDate/parse "2022-05-07")
-                  (LocalDate/parse "2022-07-06"))
+                  (LocalDate/parse "2022-02-28")
+                  (LocalDate/parse "2022-03-01"))
                 .iterator
                 iterator-seq)]
     (prn (str d) (store! (str d) (str d)))))

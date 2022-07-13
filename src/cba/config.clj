@@ -39,6 +39,9 @@
                       "Fondy application id"))
 (def FONDY-APP-KEY #(get-env "FONDY_APP_KEY"
                       "Fondy application key"))
+(def FONDY-APP-MERCHANTS #(-> (get-env "FONDY_APP_MERCHANTS"
+                                "Fondy merchants to get data for")
+                              (str/split #",")))
 (def SOLIDGATE-ID  #(get-env "SOLIDGATE_ID"
                       "Solidgate public key"))
 (def SOLIDGATE-KEY #(get-env "SOLIDGATE_KEY"
@@ -50,4 +53,4 @@
 (def TIMEOUT       #(-> (get-env "TIMEOUT" "60000"
                           "HTTP timeout")
                         str/trim
-                        Long.))
+                        parse-long))
