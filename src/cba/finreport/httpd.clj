@@ -92,11 +92,14 @@
        (when (:days res)
          (list
            "Дні: "
-           (for [[[_ day] cnt] (:days res)]
+           (for [[[_ day] cnt] (->> (:days res)
+                                    (sort-by #(second (key %))))]
              [:span [:b (.toLocalDate day)] (format " (%s рядків), " cnt)])))
        [:details
         [:summary
-         (format "Пропущено %s рядків:" (count (:skipped res)))]
+         (format "Пропущено %s рядків %s"
+           (count (:skipped res))
+           (frequencies (map first (:skipped res))))]
         [:table.skipped
          (for [[reason row] (:skipped res)]
            [:tr

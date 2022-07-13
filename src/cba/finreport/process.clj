@@ -77,7 +77,8 @@
   (parse-n "325 041,63"))
 
 
-(def TAG-RE #"(?u)#(\p{L}[\p{L}\d_\-\.]*[\p{L}\d])")
+(def TAG-RE "tag is letters, digits, -, _ and ."
+  #"(?u)#(\p{L}[\p{L}\d_\-\.]*[\p{L}\d])")
 
 
 (defn parse-card-oid
@@ -223,26 +224,43 @@
 
 (def CONFIG
   ;; NOTE не забувай юзази some-> тому що трапляються рядки без даних
-  {:oschad     {:start #(str/includes? % "№ п/п")
-                :skip  #(or (#{"ТОВ \"АВТО УА ГРУП\""
-                               "ТОВ \"ФК \"ЕЛАЄНС\""
-                               "Іщенко Максим Федорович"}
-                              (get % 13))
-                            (some-> (get % 13) (str/starts-with? "Плат.интер-эквайрин через LiqPay"))
-                            (some-> (get % 19) (str/starts-with? "Повернення "))
-                            (some->> (get % 19) (re-find #"(?i)нев[іi]рний код отримувача"))
-                            ;; no date - no transaction
-                            (= (get % 4) nil))
-                :fields
-                {:id      #(get % 2)
-                 :bank    (constantly "Oschad UAH")
-                 :date    #(kyiv (dt (date (get % 4))))
-                 :amount  #(parse-n (get % 10))
-                 :comment #(make-comment (get % 13) (get % 19))
-                 :tags    #(parse-tags (get % 19))}}
-   :oschad-ext {:start    #(str/includes? % "№ п/п")
-                :skip     #(or (nil? (get % 1))
-                               (some-> (get % 24) (str/starts-with? "Повернення ")))
+  {:oschad {:start #(str/includes? % "№ п/п")
+            :skip  #(cond
+                      (#{"ТОВ \"АВТО УА ГРУП\""
+                         "Іщенко Максим Федорович"}
+                        (get % 13))
+                      :ngo
+
+                      (= "ТОВ \"ФК \"ЕЛАЄНС\"" (get % 13))
+                      :fondy
+
+                      (some-> (get % 13) (str/starts-with? "Плат.интер-эквайрин через LiqPay"))
+                      :liqpay
+
+                      (some-> (get % 19) (str/starts-with? "Повернення "))
+                      :return
+
+                      (some->> (get % 19) (re-find #"(?i)нев[іi]рний код отримувача"))
+                      :invalid-payment
+
+                      ;; no date - no transaction
+                      (= (get % 4) nil)
+                      :no-date)
+            :fields
+            {:id      #(get % 2)
+             :bank    (constantly "Oschad UAH")
+             :date    #(kyiv (dt (date (get % 4))))
+             :amount  #(parse-n (get % 10))
+             :comment #(make-comment (get % 13) (get % 19))
+             :tags    #(parse-tags (get % 19))}}
+
+   :oschad-ext {:start #(str/includes? % "№ п/п")
+                :skip  #(cond
+                          (nil? (get % 1))
+                          :no-id
+
+                          (some-> (get % 24) (str/starts-with? "Повернення "))
+                          :return)
                 :currency (fn [lazy-rows]
                             (->> (get (nth lazy-rows 5) 4)
                                  (re-find #"\((\w+)\)")
@@ -257,26 +275,42 @@
                              (format "%s (%s %s)"
                                msg (fmt-amount amount) *currency*))
                  :tags    #(parse-tags (get % 24))}}
-   :privat     {:start #(str/includes? % "Дата проводки")
-                :skip  #(or (when-let [msg (get % 5)]
-                              (or (str/starts-with? msg "Повернення ")
-                                  (str/starts-with? msg "Конвертац")))
-                            (contains? OWN-ACCOUNTS (get % 8)))
-                :fields
-                {:id      #(get % 0)
-                 :bank    (constantly "Privat UAH")
-                 :date    #(kyiv (dt (str (get % 1) " " (get % 2))))
-                 :amount  #(parse-n (get % 3))
-                 :comment #(make-comment (get % 7) (get % 5))
-                 :tags    #(parse-tags (get % 5))}}
+
+   :privat {:start #(str/includes? % "Дата проводки")
+            :skip  #(cond
+                      (some-> (get % 5) (str/starts-with? "Повернення "))
+                      :return
+
+                      (some-> (get % 5) (str/starts-with? "Конвертац"))
+                      :money-exchange
+
+                      (contains? OWN-ACCOUNTS (get % 8))
+                      :own-account)
+            :fields
+            {:id      #(get % 0)
+             :bank    (constantly "Privat UAH")
+             :date    #(kyiv (dt (str (get % 1) " " (get % 2))))
+             :amount  #(parse-n (get % 3))
+             :comment #(make-comment (get % 7) (get % 5))
+             :tags    #(parse-tags (get % 5))}}
+
    :privat-ext {:start #(str/includes? % "Дата проводки")
-                ;; be careful, it has latin i
                 :skip  #(when-let [msg (get % 7)]
-                          (or (= msg "From for") ; this is when payments return
-                              (str/starts-with? msg "Повернення ")
-                              (str/starts-with? msg "Купiвля")
-                              (str/starts-with? msg "Конвертац")
-                              (str/includes? msg "технiчне проведення усунення розбалансу")))
+                          (cond
+                            (= msg "From for")
+                            :return
+
+                            (str/starts-with? msg "Повернення ")
+                            :return
+
+                            (str/starts-with? msg "Купiвля")
+                            :money-exchange
+
+                            (str/starts-with? msg "Конвертац")
+                            :money-exchange
+
+                            (str/includes? msg "технiчне проведення усунення розбалансу")
+                            :technical))
                 :fields
                 {:id      #(get % 0)
                  :bank    #(str "Privat " (get % 4))
@@ -288,37 +322,39 @@
                              (format "%s (%s %s)"
                                message (fmt-amount amount) currency))
                  :tags    #(parse-tags (get % 7))}}
-   :fondy      {:start #(str/includes? % "Внутрішній ID")
-                :skip  #(not= (get % 3) "approved")
-                :fields
-                {:id      #(get % 6)
-                 :bank    #(if (str/starts-with? (get % 6) "SUB-")
-                             "Fondy Sub"
-                             "Fondy")
-                 :date    #(kyiv (dt (get % 1)))
-                 :amount  #(parse-n (get % 10))
-                 :comment #(let [amount   (get % 4)
-                                 currency (get % 5)
-                                 card     (get % 12)
-                                 country  (get % 13)
-                                 _email   (get % 7)]
-                             (format "%s ***%s (%s %s)"
-                               country card (fmt-amount amount) currency))
-                 :tags    #(:tags (parse-card-oid (get % 6)))}}
-   :manual     {:start #(str/includes? % "Тип надходження")
-                :skip  (constantly false)
-                :fields
-                {:id      (constantly "")
-                 :bank    #(if (= "готівка" (get % 3))
-                             "Cash"
-                             (get % 3))
-                 :date    #(kyiv (dt (get % 0)))
-                 :amount  #(parse-n (get % 1))
-                 :comment #(get % 2)
-                 :tags    #(parse-tags (get % 2))}}
+
+   :fondy  {:start #(str/includes? % "Внутрішній ID")
+            :skip  #(when (not= (get % 3) "approved") :not-approved)
+            :fields
+            {:id      #(get % 6)
+             :bank    #(if (str/starts-with? (get % 6) "SUB-")
+                         "Fondy Sub"
+                         "Fondy")
+             :date    #(kyiv (dt (get % 1)))
+             :amount  #(parse-n (get % 10))
+             :comment #(let [amount   (get % 4)
+                             currency (get % 5)
+                             card     (get % 12)
+                             country  (get % 13)
+                             _email   (get % 7)]
+                         (format "%s ***%s (%s %s)"
+                           country card (fmt-amount amount) currency))
+             :tags    #(:tags (parse-card-oid (get % 6)))}}
+
+   :manual {:start #(str/includes? % "Тип надходження")
+            :skip  (constantly nil)
+            :fields
+            {:id      (constantly "")
+             :bank    #(if (= "готівка" (get % 3))
+                         "Cash"
+                         (get % 3))
+             :date    #(kyiv (dt (get % 0)))
+             :amount  #(parse-n (get % 1))
+             :comment #(get % 2)
+             :tags    #(parse-tags (get % 2))}}
 
    :spending {:start #(str/includes? % "Постачальник")
-              :skip  (constantly false)
+              :skip  (constantly nil)
               :fields
               {:id     (constantly "")
                :bank   (constantly "Spending")
@@ -459,8 +495,9 @@
                (let [skip? (cond
                              (every? nothing? row) :empty-row
                              (< (count row) 3)     :too-short
-                             (skip-fn row)         :skipped
-                             :else                 nil)
+                             ;; skip-fn either returns reason to skip or falsy
+                             ;; value
+                             :else                 (skip-fn row))
                      res   (when-not skip?
                              (parse-row fields currency i row))
                      skip? (cond
