@@ -92,7 +92,11 @@
     (into [] xf res)))
 
 
-(defn parse-source [src]
+(defn parse-source
+  "Parse ?traffic_source=one~_two~#three into
+   {:tags [\"one\" \"three\"]
+    :hiddens [\"two\"]}"
+  [src]
   (reduce
     (fn [acc v]
       (cond
@@ -124,10 +128,8 @@
                 "Solidgate Sub"
                 "Solidgate Card")
      :date    (process/gmt (process/dt dt-fmt (:created_at order)))
-     :amount  (- (to-uah
-                   (:processing_currency order) (:processing_amount order))
-                 (to-uah
-                   (:finance_fee_currency tx) (:finance_fee_amount tx)))
+     :amount  (- (to-uah (:processing_currency order) (:processing_amount order))
+                 (to-uah (:finance_fee_currency tx) (:finance_fee_amount tx)))
      :comment (format "%s ***%s (%s %s)"
                 (-> tx :card :country)
                 (last (str/split (-> tx :card :number) #"XXX"))
@@ -199,10 +201,18 @@
       (format "2022-06-%02d 00:00:00" (inc i)) ))
   (store! :charity "2022-06-17 00:00:00" "2022-06-18 00:00:00")
   (store! :charity "2022-06-18 00:00:00" "2022-06-19 00:00:00")
-  (def q (get-report {:from "2022-06-17 00:00:00"
-                      :to   "2022-06-18 00:00:00"
+  (def q (get-report {:from "2022-07-10 21:00:00"
+                      :to   "2022-07-11 21:00:00"
                       :auth (charity-auth)}))
 
+  (:created_at (last q))
+  (apply + (map :processing_amount q))
+  (apply + (map #(or (some-> % :transactions first :finance_fee_amount) 0) q))
+
+  (first q)
+
+
+  (first (filter #(= "EUR" (:currency %)) q))
 
   (doseq [d (-> (.datesUntil
                   (LocalDate/parse "2022-05-06")
