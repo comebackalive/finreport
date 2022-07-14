@@ -502,8 +502,9 @@
                              (parse-row fields currency i row))
                      skip? (cond
                              skip?                skip?
-                             (nil? (:amount res)) :no-amount
-                             (neg? (:amount res)) :neg-amount
+                             (nil? (:bank res))   :empty-bank
+                             (nil? (:amount res)) :empty-amount
+                             (neg? (:amount res)) :negative-amount
                              :else                nil)]
                  (if skip?
                    (do
