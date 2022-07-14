@@ -323,23 +323,33 @@
                                message (fmt-amount amount) currency))
                  :tags    #(parse-tags (get % 7))}}
 
-   :fondy  {:start #(str/includes? % "Внутрішній ID")
-            :skip  #(when (not= (get % 3) "approved") :not-approved)
-            :fields
-            {:id      #(get % 6)
-             :bank    #(if (str/starts-with? (get % 6) "SUB-")
-                         "Fondy Sub"
-                         "Fondy")
-             :date    #(kyiv (dt (get % 1)))
-             :amount  #(parse-n (get % 10))
-             :comment #(let [amount   (get % 4)
-                             currency (get % 5)
-                             card     (get % 12)
-                             country  (get % 13)
-                             _email   (get % 7)]
-                         (format "%s ***%s (%s %s)"
-                           country card (fmt-amount amount) currency))
-             :tags    #(:tags (parse-card-oid (get % 6)))}}
+   :universal {:start #(str/includes? % "Рахунок")
+               :skip  (constantly false)
+               :fields
+               {:id      (constantly nil)
+                :bank    (constantly "Universal")
+                :date    #(kyiv (dt (get % 4)))
+                :amount  #(parse-n (get % 14))
+                :comment #(make-comment (get % 10) (get % 15))
+                :tags    #(parse-tags (get % 15))}}
+
+   :fondy {:start #(str/includes? % "Внутрішній ID")
+           :skip  #(when (not= (get % 3) "approved") :not-approved)
+           :fields
+           {:id      #(get % 6)
+            :bank    #(if (str/starts-with? (get % 6) "SUB-")
+                        "Fondy Sub"
+                        "Fondy")
+            :date    #(kyiv (dt (get % 1)))
+            :amount  #(parse-n (get % 10))
+            :comment #(let [amount   (get % 4)
+                            currency (get % 5)
+                            card     (get % 12)
+                            country  (get % 13)
+                            _email   (get % 7)]
+                        (format "%s ***%s (%s %s)"
+                          country card (fmt-amount amount) currency))
+            :tags    #(:tags (parse-card-oid (get % 6)))}}
 
    :manual {:start #(str/includes? % "Тип надходження")
             :skip  (constantly nil)
@@ -372,6 +382,7 @@
   (let [rows (into [] (take 15 data))
         g    (fn [x y] (some-> (get-in rows [x y]) str str/trim))]
     (cond
+      (= (g 0 0) "ЄДРПОУ")                                     :universal
       (= (g 0 0) "Внутрішній ID")                              :fondy
       (= (g 10 14) "КТ рахунку (еквівалент)")                  :oschad-ext
       (= (g 0 0) "Назва Клієнта")                              :oschad
